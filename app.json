@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "HyperMusic",
+    "slug": "HyperMusic",
+    "version": "1.2.3",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.studio.hypermusic",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.WAKE_LOCK"
+      ]
+    },
+    "plugins": [
+      "expo-image",
+      "expo-sqlite",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "minSdkVersion": 26,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-dontwarn javax.script.**\n-dontwarn org.mozilla.javascript.**\n-keep class com.margelo.nitro.hyperextractor.** { *; }\n-keepclassmembers class com.margelo.nitro.hyperextractor.** { *; }\n-keep class org.schabi.newpipe.** { *; }\n-keep class com.grack.nanojson.** { *; }\n-keep class com.google.protobuf.** { *; }\n-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite { *; }\n-keepclassmembers enum * extends com.google.protobuf.Internal$EnumLite { *; }"
+          }
+        }
+      ],
+      "./plugins/with-abi-splits.js",
+      "./plugins/with-desugaring.js"
+    ]
+  }
+}

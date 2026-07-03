@@ -1,0 +1,1 @@
+export * from './specs/hyper-extractor.nitro';

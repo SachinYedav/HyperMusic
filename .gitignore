@@ -1,0 +1,57 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+.pnp.*
+.yarn/cache
+
+# Expo & EAS
+.expo/
+.eas/
+dist/
+web-build/
+expo-env.d.ts
+*.apk
+*.aab
+*.ipa
+*.tar.gz
+
+# Native & Nitro Modules
+.kotlin/
+.cxx/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# SQLite Databases
+*.db
+*.db-journal
+hypermusic.db
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android

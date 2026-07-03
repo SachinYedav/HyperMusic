@@ -1,0 +1,3 @@
+export const SEARCH_DEBOUNCE_MS = 250;
+export const SEARCH_SUGGESTION_CACHE_LIMIT = 50;
+export const SEARCH_SUGGESTION_LIMIT = 8;

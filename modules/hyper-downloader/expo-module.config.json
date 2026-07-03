@@ -1,0 +1,9 @@
+{
+  "platforms": ["android", "apple"],
+  "apple": {
+    "modules": ["HyperDownloaderModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.hyperdownloader.HyperDownloaderModule"]
+  }
+}

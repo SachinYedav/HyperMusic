@@ -1,0 +1,45 @@
+# .easignore
+# When this file exists, EAS Build uses it instead of .gitignore to determine which files to upload to the cloud worker.
+# It must ignore large local caches and build folders, while preserving all necessary source files for native compilation (including local Nitro submodules).
+
+# Version Control & Dependencies
+.git/
+node_modules/
+modules/react-native-hyper-extractor/node_modules/
+.pnp.*
+.yarn/cache
+
+# Local Build Caches & Intermediate Native Folders
+.expo/
+.eas/
+dist/
+web-build/
+.cxx/
+.kotlin/
+android/.gradle/
+android/build/
+android/app/build/
+ios/build/
+ios/Pods/
+modules/react-native-hyper-extractor/android/build/
+modules/react-native-hyper-extractor/android/.gradle/
+modules/react-native-hyper-extractor/.cxx/
+modules/react-native-hyper-extractor/ios/build/
+modules/react-native-hyper-extractor/ios/Pods/
+
+# Local SQLite Databases & Assets
+*.db
+*.db-journal
+hypermusic.db
+
+# IDE, System & Debug Logs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.pem
+.env*.local
+*.tsbuildinfo
