@@ -52,6 +52,7 @@ jobs:
           alias: ${{ secrets.KEY_ALIAS }}
           keyStorePassword: ${{ secrets.STORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
+          buildToolsVersion: 34.0.0
 
       - name: Upload Artifacts to Release
         uses: softprops/action-gh-release@v2
