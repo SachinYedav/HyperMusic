@@ -43,6 +43,9 @@ jobs:
         working-directory: ./android
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Install Build Tools 29.0.3 for Sign Action
+        run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;29.0.3"
+
       - name: Sign APKs
         uses: r0adkll/sign-android-release@v1
         id: sign_app
@@ -52,7 +55,6 @@ jobs:
           alias: ${{ secrets.KEY_ALIAS }}
           keyStorePassword: ${{ secrets.STORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
-          buildToolsVersion: 34.0.0
 
       - name: Upload Artifacts to Release
         uses: softprops/action-gh-release@v2
