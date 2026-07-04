@@ -30,6 +30,12 @@ jobs:
       - name: Install Node Dependencies
         run: npm ci
 
+      - name: Generate Nitro C++ Bindings (Nitrogen)
+        working-directory: ./modules/react-native-hyper-extractor
+        run: |
+          npm install
+          npm run codegen
+
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --clean
 
