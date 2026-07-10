@@ -12,6 +12,16 @@ Unlike traditional React Native streaming applications that suffer from JavaScri
 
 ---
 
+## 📥 Download & Quick Start
+
+The fastest way to experience HyperMusic is to download the pre-compiled APK directly.
+
+1. Go to the [Releases](../../releases/latest) page.
+2. Download the **Universal APK** (`app-universal-release-signed.apk`) which works on all Android devices.
+   *(Optional: You can also download architecture-specific splits like `arm64-v8a` if you know your device's architecture and want a smaller app size).*
+3. Install the APK on your Android device and enjoy zero-overhead streaming!
+
+---
 ## 📱 Key Features
 
 HyperMusic is engineered from the ground up for power-users, prioritizing a purely local-first, premium experience.
