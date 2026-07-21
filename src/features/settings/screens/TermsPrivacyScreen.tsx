@@ -118,7 +118,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     color: colors.background,
   },
   content: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xs,
     paddingTop: spacing.lg,
     paddingBottom: 140,
   },
@@ -138,7 +138,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },

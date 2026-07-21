@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, FlatList, Dimensions } from 'react-n
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { useTheme, spacing, typography } from '@/theme';
+import { useTheme, spacing, radius, typography } from '@/theme';
 import { usePlayerStore } from '@/store';
 import { BrowseItem } from 'react-native-hyper-extractor';
 
@@ -49,7 +49,7 @@ export const HeroBannerCard: React.FC<HeroBannerCardProps> = React.memo(({ secti
   const cardWidth = isSingle ? width - spacing.md * 2 : width * 0.85;
 
   const renderItem = useCallback(({ item }: { item: BrowseItem }) => (
-    <Pressable style={[styles.card, { width: cardWidth }]} onPress={() => handlePress(item)}>
+    <View style={[styles.card, { width: cardWidth }]}>
       <Image source={{ uri: item.artworkUrl }} style={styles.image} contentFit="cover" />
       <LinearGradient colors={['transparent', colors.overlayDark]} style={styles.gradient} />
       <View style={styles.content}>
@@ -57,11 +57,14 @@ export const HeroBannerCard: React.FC<HeroBannerCardProps> = React.memo(({ secti
           <Text style={[styles.title, { color: colors.white }]} numberOfLines={2}>{item.title}</Text>
           <Text style={[styles.subtitle, { color: colors.white, opacity: 0.8 }]} numberOfLines={1}>{item.subtitle}</Text>
         </View>
-        <View style={[styles.exploreBtn, { backgroundColor: colors.brand }]}>
+        <Pressable 
+          style={({ pressed }) => [styles.exploreBtn, { backgroundColor: colors.brand, opacity: pressed ? 0.8 : 1 }]}
+          onPress={() => handlePress(item)}
+        >
           <Text style={[styles.exploreText, { color: colors.white }]}>Explore</Text>
-        </View>
+        </Pressable>
       </View>
-    </Pressable>
+    </View>
   ), [cardWidth, colors.brand, handlePress]);
 
   return (
@@ -107,7 +110,7 @@ const styles = StyleSheet.create({
   card: {
     aspectRatio: 1, 
     maxHeight: 360,
-    borderRadius: 16,
+    borderRadius: radius.sm,
     overflow: 'hidden',
     justifyContent: 'flex-end',
   },

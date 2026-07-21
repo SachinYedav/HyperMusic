@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '45%',
     height: 110,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     overflow: 'hidden',
   },
   cardContent: {

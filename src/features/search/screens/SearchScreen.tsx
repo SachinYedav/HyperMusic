@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Keyboard, TextInput, ScrollView, TouchableOpacity, Text } from 'react-native';
 import { Screen } from '@/ui/Screen';
-import { useTheme, spacing, typography } from '@/theme';
+import { useTheme, spacing, radius, typography } from '@/theme';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
 import { useEffect } from 'react';
@@ -249,8 +249,8 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
     borderWidth: 1,
     backgroundColor: 'transparent',
   },

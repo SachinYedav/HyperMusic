@@ -208,7 +208,7 @@ export function PersonalizeTasteScreen() {
     if (liveExploreShelves && liveExploreShelves.length > 0) {
       liveExploreShelves.forEach((shelf: BrowseShelf) => {
         if (shelf.items && shelf.items.length > 0) {
-          shelf.items.forEach((item) => {
+          shelf.items.forEach((item: any) => {
             if (item.title) {
               const cleanTitle = item.title.trim();
               const id = cleanTitle;
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   card: {
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     padding: spacing.md,
   },
   cardHeader: {

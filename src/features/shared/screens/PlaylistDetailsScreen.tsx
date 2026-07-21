@@ -219,11 +219,11 @@ export function PlaylistDetailsScreen({ navigation, route }: Props) {
                 }
               }}
             >
-              <Play color={colors.background} size={20} fill={colors.background} />
-              <Text style={[styles.playBtnText, { color: colors.background }]}>Play</Text>
+              <Play color={colors.background} size={22} fill={colors.background} />
+              <Text style={[styles.playBtnText, { color: colors.background }]}>Play All</Text>
             </Pressable>
             <Pressable
-              style={[styles.shuffleBtn, { borderColor: colors.border }]}
+              style={[styles.shuffleBtn, { backgroundColor: colors.border }]}
               onPress={() => {
                 if (playlistData?.tracks) {
                   const shuffled = [...playlistData.tracks].sort(() => Math.random() - 0.5);
@@ -232,7 +232,6 @@ export function PlaylistDetailsScreen({ navigation, route }: Props) {
               }}
             >
               <Shuffle color={colors.text} size={20} />
-              <Text style={[styles.shuffleBtnText, { color: colors.text }]}>Shuffle</Text>
             </Pressable>
           </View>
         </View>
@@ -285,7 +284,7 @@ const styles = StyleSheet.create({
   artwork: {
     width: 220,
     height: 220,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.5,
@@ -332,14 +331,16 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
+    marginBottom: spacing.xl,
   },
   playBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
+    height: 52,
     borderRadius: radius.full,
     gap: spacing.sm,
   },
@@ -348,18 +349,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   shuffleBtn: {
-    flex: 1,
-    flexDirection: 'row',
+    width: 52,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    gap: spacing.sm,
-  },
-  shuffleBtnText: {
-    fontSize: typography.bodyLg,
-    fontWeight: 'bold',
+    borderRadius: 26,
   },
   trackList: {
     paddingHorizontal: spacing.md,

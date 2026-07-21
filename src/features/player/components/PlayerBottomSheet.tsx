@@ -1,5 +1,5 @@
 import React, { useCallback, memo, useState, useEffect } from 'react';
-import { View, Text, useWindowDimensions, StyleSheet, Alert, ActivityIndicator, AppState, Platform, LayoutChangeEvent } from 'react-native';
+import { View, Text, useWindowDimensions, StyleSheet, Alert, ActivityIndicator, AppState, Platform, LayoutChangeEvent, BackHandler } from 'react-native';
 import { Gesture, GestureDetector, TouchableOpacity, ScrollView, FlatList } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -25,6 +25,7 @@ import { useTheme, spacing, typography } from '@/theme';
 import { darkColors } from '@/theme/colors';
 import { createStyles } from './PlayerBottomSheet.styles';
 import { AnimatedEQ } from '@/ui/AnimatedEQ';
+import { MarqueeText } from '@/ui/MarqueeText';
 import { downloadService } from '@/features/library/services/downloadService';
 import { usePlayerStore, useSettingsStore } from '@/store';
 import { usePlaylistSelectionStore } from '@/store/usePlaylistSelectionStore';
@@ -56,9 +57,9 @@ const formatTime = (seconds: number) => {
 };
 
 const MiniPlayerComponent = memo(({
-  onExpand, styles, track, isPlaying, isLoading, progress, iconColor
+  onExpand, styles, track, isPlaying, isLoading, progress, iconColor, themeColors
 }: {
-  onExpand: () => void, styles: any, track: any, isPlaying: boolean, isLoading: boolean, progress: number, iconColor: string
+  onExpand: () => void, styles: any, track: any, isPlaying: boolean, isLoading: boolean, progress: number, iconColor: string, themeColors: any
 }) => {
   const togglePlayPause = () => {
     if (isPlaying) usePlayerStore.getState().pause();
@@ -76,7 +77,7 @@ const MiniPlayerComponent = memo(({
       >
         <Image source={track?.artworkUrl || track?.artwork || require('../../../../assets/default-artwork.png')} style={styles.miniArt} contentFit="cover" />
         <View style={styles.miniInfo}>
-          <Text style={styles.miniTitle} numberOfLines={1}>{track?.title || 'Not Playing'}</Text>
+          <MarqueeText style={styles.miniTitle} fadeColors={[themeColors.surface, 'transparent']}>{track?.title || 'Not Playing'}</MarqueeText>
           <Text style={styles.miniArtist} numberOfLines={1}>{track?.artist || 'Unknown'}</Text>
         </View>
         <TouchableOpacity style={styles.miniBtn} onPress={togglePlayPause}>
@@ -108,12 +109,12 @@ const TopBarComponent = memo(({ styles, onCollapse, activeTrack }: { styles: any
     </TouchableOpacity>
 
     <View style={styles.tabPills}>
-      <View style={styles.tabPillActive}>
+      <TouchableOpacity style={styles.tabPillActive}>
         <Text style={styles.tabPillText}>Song</Text>
-      </View>
-      <View style={styles.tabPillInactive}>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tabPillInactive}>
         <Text style={[styles.tabPillText, { opacity: 0.6 }]}>Video</Text>
-      </View>
+      </TouchableOpacity>
     </View>
 
     <View style={styles.topBarRight}>
@@ -325,7 +326,10 @@ export const PlayerBottomSheet: React.FC = () => {
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const isLoading = usePlayerStore((state) => state.isBuffering);
 
-  const { position, duration } = useProgress();
+  const rawProgress = useProgress();
+  const isResolving = playbackState === 'resolving' || playbackState === 'loading' || isLoading;
+  const position = isResolving ? 0 : rawProgress.position;
+  const duration = isResolving ? 0 : rawProgress.duration;
   const miniProgress = duration > 0 ? (position / duration) * 100 : 0;
 
   // ── Database & Likes & Downloads ──
@@ -453,6 +457,28 @@ export const PlayerBottomSheet: React.FC = () => {
     return (QUEUE_COLLAPSED_Y - queueTranslateY.value) / (QUEUE_COLLAPSED_Y - QUEUE_EXPANDED_Y);
   });
 
+  // ── Hardware Back Button Progressive Collapse ──
+  useEffect(() => {
+    const onBackPress = () => {
+      if (queueTranslateY.value < QUEUE_COLLAPSED_Y - 20) {
+        cancelAnimation(queueTranslateY);
+        queueTranslateY.value = withSpring(QUEUE_COLLAPSED_Y, { damping: 25, stiffness: 250, mass: 0.5 });
+        return true;
+      }
+      
+      if (translateY.value < MINIPLAYER_Y - 20) {
+        cancelAnimation(translateY);
+        translateY.value = withSpring(MINIPLAYER_Y, { damping: 25, stiffness: 250, mass: 0.5 });
+        return true;
+      }
+
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backHandler.remove();
+  }, [queueTranslateY, translateY, QUEUE_COLLAPSED_Y, MINIPLAYER_Y]);
+
   // --- Queue Pan Gesture ---
   const queuePanGesture = Gesture.Pan()
     .onStart(() => { cancelAnimation(queueTranslateY); queueContextY.value = queueTranslateY.value; })
@@ -561,7 +587,9 @@ export const PlayerBottomSheet: React.FC = () => {
     const left1 = 16 + ARTWORK_MINI_SIZE + 16;
     const left = interpolate(queueProgress.value, [0, HALF_PROGRESS, 1], [left0, leftHalf, left1], Extrapolation.CLAMP);
 
-    return { position: 'absolute', top, left, right: 20, zIndex: 11 };
+    const right = interpolate(queueProgress.value, [0, HALF_PROGRESS, 1], [20, 20, 120], Extrapolation.CLAMP);
+
+    return { position: 'absolute', top, left, right, zIndex: 11, overflow: 'hidden' };
   });
 
   const titleAnimatedStyle = useAnimatedStyle(() => ({
@@ -572,15 +600,6 @@ export const PlayerBottomSheet: React.FC = () => {
   const artistAnimatedStyle = useAnimatedStyle(() => ({
     fontSize: interpolate(queueProgress.value, [0, HALF_PROGRESS, 1], [typography.bodyLg, typography.bodyLg, typography.caption], Extrapolation.CLAMP),
   }));
-
-  const textBackdropStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(queueProgress.value, [0, HALF_PROGRESS, 1], [0, 0.4, 0], Extrapolation.CLAMP);
-    return {
-      opacity, position: 'absolute',
-      bottom: -10, top: -10, left: -20, right: -20,
-      backgroundColor: darkColors.black, borderRadius: 8, zIndex: -1,
-    };
-  });
 
   const state3ButtonsStyle = useAnimatedStyle(() => {
     const opacity = interpolate(queueProgress.value, [0.6, 0.9], [0, 1], Extrapolation.CLAMP);
@@ -622,7 +641,7 @@ export const PlayerBottomSheet: React.FC = () => {
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.wrapper, bottomSheetStyle]} pointerEvents="box-none" onLayout={handleContainerLayout}>
         <Animated.View style={[styles.miniPlayerContainer, miniplayerStyle]}>
-          <MiniPlayerComponent onExpand={handleExpand} styles={styles} track={activeTrack} isPlaying={isPlaying} isLoading={isLoading} progress={miniProgress} iconColor={themeColors.text} />
+          <MiniPlayerComponent onExpand={handleExpand} styles={styles} track={activeTrack} isPlaying={isPlaying} isLoading={isLoading} progress={miniProgress} iconColor={themeColors.text} themeColors={themeColors} />
         </Animated.View>
 
         <Animated.View style={[styles.fullscreenContainer, fullscreenStyle]}>
@@ -643,9 +662,12 @@ export const PlayerBottomSheet: React.FC = () => {
           </Animated.View>
 
           <Animated.View style={textMorphStyle}>
-            <Animated.View style={textBackdropStyle} />
-            <Animated.Text style={[styles.songTitle, titleAnimatedStyle]} numberOfLines={1}>{activeTrack?.title || 'Not Playing'}</Animated.Text>
-            <Animated.Text style={[styles.songArtist, artistAnimatedStyle]} numberOfLines={1}>{activeTrack?.artist || 'Unknown'}</Animated.Text>
+            <MarqueeText style={[styles.songTitle, titleAnimatedStyle]} delay={1000}>
+              {activeTrack?.title || 'Not Playing'}
+            </MarqueeText>
+            <Animated.Text style={[styles.songArtist, artistAnimatedStyle]} numberOfLines={1}>
+              {activeTrack?.artist || 'Unknown'}
+            </Animated.Text>
           </Animated.View>
 
           <Animated.View style={state3ButtonsStyle}>

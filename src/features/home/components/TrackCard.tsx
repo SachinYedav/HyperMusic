@@ -35,7 +35,7 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
         onPress={() => onPress(track)}
         activeOpacity={0.8}
       >
-        <View style={[styles.premiumBanner, { width: videoWidth, aspectRatio: 16 / 9, borderRadius: 16 }]}>
+        <View style={[styles.premiumBanner, { width: videoWidth, aspectRatio: 16 / 9, borderRadius: radius.sm }]}>
           <Image source={track.artworkUrl} style={styles.bannerImage} contentFit="cover" transition={200} />
           <LinearGradient colors={[colors.overlayLight, 'transparent', colors.overlayDark]} style={styles.gradient} />
 
@@ -60,7 +60,7 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
         onPress={() => onPress(track)}
         activeOpacity={0.8}
       >
-        <View style={[styles.premiumBanner, { width: podcastWidth, aspectRatio: 16 / 9, borderRadius: 20 }]}>
+        <View style={[styles.premiumBanner, { width: podcastWidth, aspectRatio: 16 / 9, borderRadius: radius.sm }]}>
           <Image source={track.artworkUrl} style={styles.bannerImage} contentFit="cover" transition={200} />
           <LinearGradient colors={[colors.overlayLight, 'transparent', colors.overlayDark]} style={styles.gradient} />
 
@@ -83,7 +83,7 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
       onPress={() => onPress(track)}
       activeOpacity={0.7}
     >
-      <View style={{ width: 140, height: 140, overflow: 'hidden', borderRadius: isArtist ? 70 : radius.md }}>
+      <View style={{ width: 140, height: 140, overflow: 'hidden', borderRadius: isArtist ? 70 : radius.sm }}>
         <Image
           source={track.artworkUrl}
           style={[

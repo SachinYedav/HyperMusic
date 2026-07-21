@@ -131,3 +131,16 @@ export async function clearHistory(db: SQLiteDatabase): Promise<void> {
     console.error('[HistoryService] Failed to clear history:', error);
   }
 }
+
+/**
+ * Removes a specific single track from the playback history.
+ */
+export async function deleteHistoryItem(db: SQLiteDatabase, trackId: string): Promise<void> {
+  try {
+    await db.runAsync(`DELETE FROM PlaybackHistory WHERE trackId = ?`, [trackId]);
+    libraryEmitter.emit();
+  } catch (error) {
+    console.error('[HistoryService] Failed to delete history item:', error);
+  }
+}
+

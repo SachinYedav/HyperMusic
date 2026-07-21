@@ -126,9 +126,9 @@ class PlayerEngineManagerClass {
       if (this.fetchingRadioForId !== activeTrack.id) {
         this.fetchingRadioForId = activeTrack.id;
 
-        HyperExtractor.getRadioQueue(activeTrack.id).then(radioTracks => {
+        HyperExtractor.getRadioQueue(activeTrack.id).then((radioTracks: any[]) => {
           if (radioTracks.length > 0) {
-            const mappedTracks: Track[] = radioTracks.map(t => ({
+            const mappedTracks: Track[] = radioTracks.map((t: any) => ({
               id: t.id,
               title: t.title,
               artist: t.artist,
@@ -138,7 +138,7 @@ class PlayerEngineManagerClass {
             }));
             usePlayerStore.getState().appendTracks(mappedTracks);
           }
-        }).catch(err => {
+        }).catch((err: any) => {
           console.error(`[PlayerEngineManager] ❌ Failed to fetch Radio Queue:`, err);
           this.fetchingRadioForId = null;
         });
@@ -184,6 +184,7 @@ class PlayerEngineManagerClass {
         if (!safeUrl || isExpired) {
           try {
             safeUrl = await extractorService.getStreamUrl(track.id, { signal });
+
             if (signal.aborted) throw new Error('Aborted');
 
             usePlayerStore.getState().updateTrack(track.id, {
@@ -215,6 +216,16 @@ class PlayerEngineManagerClass {
 
       // Process Current Track
       if (signal.aborted) return;
+      
+      // If syncing a new track, stop the old one bleeding immediately
+      const isExtractedLocally = windowTracks[0].isExtracted || windowTracks[0].url?.startsWith('file://') || downloadService.getLocalPaths(windowTracks[0].id).audioFile.exists;
+      if (!isExtractedLocally) {
+         const currentNativeActive = await TrackPlayer.getActiveTrackIndex();
+         if (currentNativeActive !== undefined && currentNativeActive !== -1) {
+             await TrackPlayer.pause();
+         }
+      }
+
       usePlayerStore.getState().setPlaybackState('resolving');
       usePlayerStore.getState().setPlaybackFlags(usePlayerStore.getState().isPlaying, true);
 

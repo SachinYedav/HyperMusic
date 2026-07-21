@@ -10,8 +10,10 @@ import { TermsPrivacyScreen } from '@/features/settings/screens/TermsPrivacyScre
 import { LicensesScreen } from '@/features/settings/screens/LicensesScreen';
 import { LicenseDetailScreen } from '@/features/settings/screens/LicenseDetailScreen';
 import { PersonalizeTasteScreen } from '@/features/settings/screens/PersonalizeTasteScreen';
+import { AppUpdatesScreen } from '@/features/settings/screens/AppUpdatesScreen';
 
 import { PlaylistDetailsScreen } from '@/features/shared/screens/PlaylistDetailsScreen';
+import { PodcastDetailsScreen } from '@/features/shared/screens/PodcastDetailsScreen';
 import { AlbumDetailsScreen } from '@/features/shared/screens/AlbumDetailsScreen';
 import { ArtistProfileScreen } from '@/features/shared/screens/ArtistProfileScreen';
 import { ExploreCategoryScreen } from '@/features/explore/screens/ExploreCategoryScreen';
@@ -51,6 +53,7 @@ export function HomeStackNavigator() {
     <HomeStack.Navigator screenOptions={screenOptions}>
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
       <HomeStack.Screen name="PlaylistDetails" component={PlaylistDetailsScreen} />
+      <HomeStack.Screen name="PodcastDetails" component={PodcastDetailsScreen} />
       <HomeStack.Screen name="AlbumDetails" component={AlbumDetailsScreen} />
       <HomeStack.Screen name="ArtistProfile" component={ArtistProfileScreen} />
       <HomeStack.Screen name="ExploreCategory" component={ExploreCategoryScreen} />
@@ -67,6 +70,7 @@ export function SearchStackNavigator() {
     <SearchStack.Navigator screenOptions={screenOptions}>
       <SearchStack.Screen name="SearchMain" component={SearchScreen} />
       <SearchStack.Screen name="PlaylistDetails" component={PlaylistDetailsScreen} />
+      <SearchStack.Screen name="PodcastDetails" component={PodcastDetailsScreen} />
       <SearchStack.Screen name="AlbumDetails" component={AlbumDetailsScreen} />
       <SearchStack.Screen name="ArtistProfile" component={ArtistProfileScreen} />
       <SearchStack.Screen name="ExploreCategory" component={ExploreCategoryScreen} />
@@ -83,6 +87,7 @@ export function LibraryStackNavigator() {
     <LibraryStack.Navigator screenOptions={screenOptions}>
       <LibraryStack.Screen name="LibraryMain" component={LibraryScreen} />
       <LibraryStack.Screen name="PlaylistDetails" component={PlaylistDetailsScreen} />
+      <LibraryStack.Screen name="PodcastDetails" component={PodcastDetailsScreen} />
       <LibraryStack.Screen name="AlbumDetails" component={AlbumDetailsScreen} />
       <LibraryStack.Screen name="ArtistProfile" component={ArtistProfileScreen} />
       <LibraryStack.Screen name="ExploreCategory" component={ExploreCategoryScreen} />
@@ -103,6 +108,7 @@ export function SettingsStackNavigator() {
       <SettingsStack.Screen name="Licenses" component={LicensesScreen} />
       <SettingsStack.Screen name="LicenseDetail" component={LicenseDetailScreen} />
       <SettingsStack.Screen name="PersonalizeTaste" component={PersonalizeTasteScreen} />
+      <SettingsStack.Screen name="AppUpdates" component={AppUpdatesScreen} />
     </SettingsStack.Navigator>
   );
 }

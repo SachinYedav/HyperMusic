@@ -7,13 +7,15 @@ import { MoreVertical } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
+import { AnimatedEQ } from '@/ui/AnimatedEQ';
 
 interface TrackResultCardProps {
   track: ExtractedTrack;
   onPress: (track: ExtractedTrack) => void;
+  isPlaying?: boolean;
 }
 
-export const TrackResultCard: React.FC<TrackResultCardProps> = React.memo(({ track, onPress }) => {
+export const TrackResultCard: React.FC<TrackResultCardProps> = React.memo(({ track, onPress, isPlaying = false }) => {
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { openSheet } = useActionSheetStore();
@@ -30,12 +32,19 @@ export const TrackResultCard: React.FC<TrackResultCardProps> = React.memo(({ tra
       onPress={() => onPress(track)}
       activeOpacity={0.7}
     >
-      <Image 
-        source={track.artworkUrl} 
-        style={[styles.artwork, { backgroundColor: colors.border }]} 
-        contentFit="cover"
-        transition={200}
-      />
+      <View>
+        <Image 
+          source={track.artworkUrl} 
+          style={[styles.artwork, { backgroundColor: colors.border }]} 
+          contentFit="cover"
+          transition={200}
+        />
+        {isPlaying && (
+          <View style={[StyleSheet.absoluteFill, { borderRadius: radius.xs, overflow: 'hidden' }]}>
+            <AnimatedEQ isOverlay />
+          </View>
+        )}
+      </View>
       <View style={styles.infoContainer}>
         <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
           {track.title}
@@ -71,7 +80,7 @@ const styles = StyleSheet.create({
   artwork: {
     width: 56,
     height: 56,
-    borderRadius: radius.md,
+    borderRadius: radius.xs,
   },
   infoContainer: {
     flex: 1,

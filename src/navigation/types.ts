@@ -6,6 +6,7 @@ export type HomeStackParamList = {
   AlbumDetails: { id: string };
   ArtistProfile: { id: string; artistName?: string; isLocal?: boolean };
   ExploreCategory: { categoryId: string; title: string };
+  PodcastDetails: { id: string };
 };
 
 export type SearchStackParamList = {
@@ -14,6 +15,7 @@ export type SearchStackParamList = {
   AlbumDetails: { id: string };
   ArtistProfile: { id: string; artistName?: string; isLocal?: boolean };
   ExploreCategory: { categoryId: string; title: string };
+  PodcastDetails: { id: string };
 };
 
 export type LibraryStackParamList = {
@@ -22,6 +24,7 @@ export type LibraryStackParamList = {
   AlbumDetails: { id: string };
   ArtistProfile: { id: string; artistName?: string; isLocal?: boolean };
   ExploreCategory: { categoryId: string; title: string };
+  PodcastDetails: { id: string };
   DownloadsScreen: undefined;
 };
 
@@ -31,6 +34,7 @@ export type SettingsStackParamList = {
   Licenses: undefined;
   LicenseDetail: { licenseId: string; licenseName: string; licenseText: string; repository?: string; };
   PersonalizeTaste: undefined;
+  AppUpdates: undefined;
 };
 
 export type MainTabParamList = {

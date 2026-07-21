@@ -18,7 +18,7 @@ const INTERNAL_MODULES = [
     id: "react-native-hyper-extractor",
     name: "react-native-hyper-extractor",
     path: path.join(__dirname, '../modules/react-native-hyper-extractor'),
-    version: "1.0.0",
+    version: "1.1.0",
     repository: "https://github.com/SachinYedav/HyperMusic/tree/main/modules/react-native-hyper-extractor"
   },
   {

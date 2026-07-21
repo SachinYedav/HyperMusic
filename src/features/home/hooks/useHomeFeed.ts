@@ -75,11 +75,11 @@ export function useHomeFeed(selectedFilter: string = 'All') {
             const topLang = selectedLanguages[0];
             const langResult = await HyperExtractor.getDynamicChipFeed(topLang);
             if (langResult && langResult.length > 0) {
-              const musicalShelves = langResult.filter(s => 
+              const musicalShelves = langResult.filter((s: BrowseShelf) => 
                 s.items && s.items.length > 0 && 
-                s.items.some(item => item.type === 'song' || item.type === 'video' || item.type === 'artist' || item.type === 'podcast')
+                s.items.some((item: any) => item.type === 'song' || item.type === 'video' || item.type === 'artist' || item.type === 'podcast')
               );
-              extraLanguageShelves = (musicalShelves.length > 0 ? musicalShelves : langResult.filter(s => s.items && s.items.length > 0)).slice(0, 1);
+              extraLanguageShelves = (musicalShelves.length > 0 ? musicalShelves : langResult.filter((s: BrowseShelf) => s.items && s.items.length > 0)).slice(0, 1);
             }
           } catch (e) {
             console.warn('Failed to fetch extra language shelves for richer injection', e);

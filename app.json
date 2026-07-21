@@ -2,7 +2,7 @@
   "expo": {
     "name": "HyperMusic",
     "slug": "HyperMusic",
-    "version": "1.2.3",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,6 +11,7 @@
     },
     "android": {
       "package": "com.studio.hypermusic",
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -50,6 +51,7 @@
           }
         }
       ],
+      "./plugins/with-notification-icon.js",
       "./plugins/with-abi-splits.js",
       "./plugins/with-desugaring.js"
     ]

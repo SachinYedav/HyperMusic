@@ -189,7 +189,8 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
             contentFit="cover"
           />
           <LinearGradient
-            colors={['rgba(0,0,0,0.1)', colors.overlayDark]}
+            colors={['transparent', 'rgba(0,0,0,0.4)', colors.background]}
+            locations={[0, 0.6, 1]}
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
@@ -233,15 +234,14 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
             style={[styles.playBtn, { backgroundColor: colors.text }]}
             onPress={() => handlePlayAction(false)}
           >
-            <Play color={colors.background} size={20} fill={colors.background} />
-            <Text style={[styles.playBtnText, { color: colors.background }]}>Play</Text>
+            <Play color={colors.background} size={22} fill={colors.background} />
+            <Text style={[styles.playBtnText, { color: colors.background }]}>Play All</Text>
           </Pressable>
           <Pressable
-            style={[styles.shuffleBtn, { borderColor: colors.border }]}
+            style={[styles.shuffleBtn, { backgroundColor: colors.border }]}
             onPress={() => handlePlayAction(true)}
           >
             <Shuffle color={colors.text} size={20} />
-            <Text style={[styles.shuffleBtnText, { color: colors.text }]}>Shuffle</Text>
           </Pressable>
         </View>
 
@@ -317,15 +317,17 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
     padding: spacing.lg,
+    marginBottom: spacing.xs,
   },
   playBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
+    height: 52,
     borderRadius: radius.full,
     gap: spacing.sm,
   },
@@ -334,18 +336,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   shuffleBtn: {
-    flex: 1,
-    flexDirection: 'row',
+    width: 52,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    gap: spacing.sm,
-  },
-  shuffleBtnText: {
-    fontSize: typography.bodyLg,
-    fontWeight: 'bold',
+    borderRadius: 26,
   },
   section: {
     marginTop: spacing.md,

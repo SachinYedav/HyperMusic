@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, BackHandler } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView, TouchableOpacity } from '@gorhom/bottom-sheet';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -56,14 +56,29 @@ export function GlobalActionSheet() {
 
   // Present/Dismiss logic
   useEffect(() => {
+    let backHandler: any = null;
+
     if (data) {
       isClosingRef.current = false;
       bottomSheetRef.current?.expand();
+
+      // Handle Android hardware back button to close sheet
+      backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        isClosingRef.current = true;
+        bottomSheetRef.current?.close();
+        closeSheet();
+        return true;
+      });
     } else {
       isClosingRef.current = true;
       bottomSheetRef.current?.close();
+      if (backHandler) backHandler.remove();
     }
-  }, [data]);
+
+    return () => {
+      if (backHandler) backHandler.remove();
+    };
+  }, [data, closeSheet]);
 
   const handleContentLayout = useCallback((e: any) => {
     if (e.nativeEvent.layout.height > 0 && data && !isClosingRef.current) {
@@ -96,23 +111,34 @@ export function GlobalActionSheet() {
 
     let title = '';
     let subtitle = '';
+    let artwork: any = null;
 
     if (contextType === 'track') {
       title = data.title;
       subtitle = data.artist;
+      artwork = data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
     } else if (contextType === 'playlist') {
       title = data.name;
       subtitle = 'Playlist';
+      artwork = data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
     } else if (contextType === 'album') {
       title = data.title || data.name;
       subtitle = data.artist || 'Album';
+      artwork = data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
     } else if (contextType === 'artist') {
       title = data.artist || data.name;
       subtitle = 'Artist';
+      artwork = data.avatar || data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
     }
 
     return (
       <View style={styles.headerContainer}>
+        <Image
+          source={artwork || require('../../../../assets/default-artwork.png')}
+          style={[styles.headerArtwork, { backgroundColor: colors.highlight }]}
+          contentFit="cover"
+          transition={200}
+        />
         <View style={styles.headerTextContainer}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
           <Text style={[styles.headerSubtitle, { color: colors.textMuted }]} numberOfLines={1}>{subtitle}</Text>
@@ -386,12 +412,12 @@ export function GlobalActionSheet() {
       detached={true}
       containerStyle={{ zIndex: 9999, elevation: 9999 }}
       bottomInset={insets.bottom + spacing.md}
-      style={{ marginHorizontal: spacing.md }}
+      style={{ marginHorizontal: spacing.sm}}
       onChange={handleSheetChanges}
       backdropComponent={renderBackdrop}
       backgroundStyle={{
         backgroundColor: isDark ? colors.surface : colors.background,
-        borderRadius: radius.lg
+        borderRadius: radius.md
       }}
       handleIndicatorStyle={{
         backgroundColor: colors.textMuted,
@@ -425,6 +451,12 @@ const styles = StyleSheet.create({
   headerTextContainer: {
     flexShrink: 1,
     justifyContent: 'center',
+  },
+  headerArtwork: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.xs,
+    marginRight: spacing.md,
   },
   headerTitle: {
     fontSize: typography.bodyLg,

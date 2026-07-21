@@ -240,6 +240,23 @@ object YouTubeMusicEngine {
     }
 
     /**
+     * Executes a browse request for a target podcast identifier and invokes the podcast details parser.
+     *
+     * @param browseId Podcast browse identifier.
+     * @return Structured PodcastShowDetails payload.
+     */
+    fun getPodcastDetails(browseId: String): com.margelo.nitro.hyperextractor.PodcastShowDetails {
+        return try {
+            Logger.d("Engine: Fetching Podcast Details for $browseId")
+            val responseBody = fetchBrowse(browseId)
+            Parsers.parsePodcastDetails(responseBody)
+        } catch (e: Exception) {
+            Logger.e("Engine: getPodcastDetails failed", e)
+            throw EngineException("Failed to fetch Podcast Details", e)
+        }
+    }
+
+    /**
      * Executes a browse request for a target artist identifier and invokes the artist profile parser.
      *
      * @param browseId Artist browse identifier.

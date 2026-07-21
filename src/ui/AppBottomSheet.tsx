@@ -74,8 +74,8 @@ export function AppBottomSheet({
         backgroundStyle={{
           backgroundColor: colors.surface,
           borderRadius: detached ? radius.lg : undefined,
-          borderTopLeftRadius: radius.xl,
-          borderTopRightRadius: radius.xl,
+          borderTopLeftRadius: radius.lg,
+          borderTopRightRadius: radius.lg,
         }}
         handleIndicatorStyle={{
           backgroundColor: colors.textMuted,

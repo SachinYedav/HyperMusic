@@ -18,7 +18,7 @@ export const createStyles = (colors: ThemeColors) => StyleSheet.create({
     height: '100%',
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg,
   },
-  miniArt: { width: 44, height: 44, borderRadius: radius.sm },
+  miniArt: { width: 44, height: 44, borderRadius: radius.xs },
   miniInfo: { flex: 1, flexShrink: 1, marginLeft: spacing.md, marginRight: spacing.sm, justifyContent: 'center', overflow: 'hidden' },
   miniTitle: { fontSize: typography.body, fontWeight: '700', letterSpacing: -0.2, color: colors.text },
   miniArtist: { fontSize: typography.captionLg, marginTop: 1, color: colors.textMuted },
@@ -34,7 +34,7 @@ export const createStyles = (colors: ThemeColors) => StyleSheet.create({
   tabPills: { flexDirection: 'row', backgroundColor: darkColors.highlight, borderRadius: radius.xl, padding: spacing.xs },
   tabPillActive: { backgroundColor: darkColors.highlightStrong, paddingVertical: 6, paddingHorizontal: spacing.md, minWidth: 56, alignItems: 'center', borderRadius: radius.lg },
   tabPillInactive: { paddingVertical: 6, paddingHorizontal: spacing.md, minWidth: 56, alignItems: 'center' },
-  tabPillText: { color: colors.white, fontSize: typography.bodySm, fontWeight: '700' },
+  tabPillText: { color: colors.white, fontSize: typography.bodySm, fontWeight: '700', paddingHorizontal: 4 },
 
   songTitle: { color: colors.white, fontWeight: '800' },
   songArtist: { color: colors.white, opacity: 0.7, fontWeight: '500', marginTop: 2 },

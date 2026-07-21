@@ -848,6 +848,8 @@ object Parsers {
                                 
                                 if (id.startsWith("VL")) {
                                     type = "playlist"
+                                } else if (id.startsWith("MPSP") || id.startsWith("MPP")) {
+                                    type = "podcast_show"
                                 } else if (id.startsWith("UC") || id.startsWith("HC")) {
                                     type = "artist"
                                 } else if (id.startsWith("MPREb")) {
@@ -880,6 +882,8 @@ object Parsers {
                                     }
                                 } else if (id.startsWith("VL")) {
                                     type = "playlist"
+                                } else if (id.startsWith("MPSP") || id.startsWith("MPP")) {
+                                    type = "podcast_show"
                                 } else if (id.startsWith("UC") || id.startsWith("HC")) {
                                     type = "artist"
                                 }
@@ -1268,9 +1272,16 @@ object Parsers {
                                 extractTracksFromShelf(shelfContents, tracks, creator, creatorId, artworkUrl)
                             }
                         }
+                        val musicShelf = section.optJSONObject("musicShelfRenderer")
+                        if (musicShelf != null) {
+                            val shelfContents = musicShelf.optJSONArray("contents")
+                            if (shelfContents != null) {
+                                extractTracksFromShelf(shelfContents, tracks, creator, creatorId, artworkUrl)
+                            }
+                        }
                     }
                 }
-            } // Close the else block
+            }
 
             // Smart Contextual Fallback for creatorId
             if (!creator.isNullOrEmpty() && creator != "Unknown Creator" && creator != "YouTube Music" && creatorId.isNullOrEmpty()) {
@@ -1361,6 +1372,196 @@ object Parsers {
         } catch (e: Exception) {
             Logger.e("Parsers: Failed to parse Artist Profile", e)
             throw ParsingException("Failed to parse Artist Profile", cause = e)
+        }
+    }
+
+    /**
+     * Extracts podcast episodes from a musicShelfRenderer containing musicMultiRowListItemRenderer items.
+     */
+    private fun extractPodcastEpisodesFromShelf(
+        contents: org.json.JSONArray, 
+        tracks: MutableList<ExtractedTrack>,
+        parentArtist: String? = null,
+        parentArtistId: String? = null,
+        parentArtworkUrl: String? = null
+    ) {
+        for (i in 0 until contents.length()) {
+            try {
+                val item = contents.optJSONObject(i) ?: continue
+                val renderer = item.optJSONObject("musicMultiRowListItemRenderer") ?: continue
+
+                // 1. Extract Video ID
+                val videoId: String? = renderer.optJSONObject("onTap")
+                    ?.optJSONObject("watchEndpoint")
+                    ?.optString("videoId")
+                
+                if (videoId.isNullOrEmpty()) continue
+
+                // 2. Extract Title
+                val title = renderer.optJSONObject("title")
+                    ?.optJSONArray("runs")
+                    ?.optJSONObject(0)
+                    ?.optString("text") ?: "Unknown Episode"
+
+                // 3. Extract Duration / Playback Progress
+                var durationStr = ""
+                val durationRuns = renderer.optJSONObject("playbackProgress")
+                    ?.optJSONObject("musicPlaybackProgressRenderer")
+                    ?.optJSONObject("durationText")
+                    ?.optJSONArray("runs")
+                
+                if (durationRuns != null && durationRuns.length() > 0) {
+                    val lastRun = durationRuns.optJSONObject(durationRuns.length() - 1)?.optString("text") ?: ""
+                    durationStr = lastRun.replace(" • ", "").trim()
+                }
+
+                // 4. Fallback artist
+                val artist = parentArtist ?: "Unknown Creator"
+                val artistId = parentArtistId
+
+                // 5. Extract Artwork
+                var artworkUrl = parentArtworkUrl ?: ""
+                val thumbnails = renderer.optJSONObject("thumbnail")
+                    ?.optJSONObject("musicThumbnailRenderer")
+                    ?.optJSONObject("thumbnail")
+                    ?.optJSONArray("thumbnails")
+                if (thumbnails != null && thumbnails.length() > 0) {
+                    artworkUrl = getHighResArtworkUrl(thumbnails.optJSONObject(thumbnails.length() - 1)?.optString("url")) ?: artworkUrl
+                }
+
+                var durationSeconds = 0.0
+                if (durationStr.isNotEmpty()) {
+                    val parts = durationStr.split(":")
+                    if (parts.size == 2) {
+                        durationSeconds = (parts[0].toDoubleOrNull() ?: 0.0) * 60 + (parts[1].toDoubleOrNull() ?: 0.0)
+                    } else if (parts.size == 3) {
+                        durationSeconds = (parts[0].toDoubleOrNull() ?: 0.0) * 3600 + (parts[1].toDoubleOrNull() ?: 0.0) * 60 + (parts[2].toDoubleOrNull() ?: 0.0)
+                    }
+                }
+
+                tracks.add(
+                    ExtractedTrack(
+                        id = videoId,
+                        title = title,
+                        artist = artist,
+                        artistId = artistId,
+                        albumId = null,
+                        duration = durationSeconds,
+                        artworkUrl = artworkUrl
+                    )
+                )
+            } catch (e: Exception) {
+                Logger.e("Parsers: Failed to parse a podcast episode, skipping...", e)
+            }
+        }
+    }
+
+    /**
+     * Traverses browse structures to assemble a PodcastShowDetails payload.
+     *
+     * @param jsonString Raw browse JSON response string.
+     * @return Assembled PodcastShowDetails entity.
+     */
+    @Throws(ParsingException::class)
+    fun parsePodcastDetails(jsonString: String): com.margelo.nitro.hyperextractor.PodcastShowDetails {
+        val tracks = mutableListOf<ExtractedTrack>()
+        var podcastTitle = "Unknown Podcast"
+        var creator = "Unknown Creator"
+        var creatorId: String? = null
+        var artworkUrl = ""
+
+        try {
+            val root = org.json.JSONObject(jsonString)
+
+            var header = root.optJSONObject("header")?.optJSONObject("musicDetailHeaderRenderer")
+                ?: root.optJSONObject("header")?.optJSONObject("musicPodcastHeaderRenderer")
+                ?: root.optJSONObject("header")?.optJSONObject("musicResponsiveHeaderRenderer")
+
+            // Fallback for podcast playlists where header is inside tabs
+            if (header == null) {
+                header = root.optJSONObject("contents")
+                    ?.optJSONObject("twoColumnBrowseResultsRenderer")
+                    ?.optJSONArray("tabs")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("tabRenderer")
+                    ?.optJSONObject("content")
+                    ?.optJSONObject("sectionListRenderer")
+                    ?.optJSONArray("contents")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("musicResponsiveHeaderRenderer")
+            }
+
+            if (header != null) {
+                val headerTitle = header.optJSONObject("title")?.optJSONArray("runs")?.optJSONObject(0)?.optString("text")
+                if (headerTitle != null) podcastTitle = headerTitle
+
+                // Check author/creator
+                val authorRuns = header.optJSONObject("author")?.optJSONArray("runs") 
+                               ?: header.optJSONObject("subtitle")?.optJSONArray("runs")
+                               ?: header.optJSONObject("straplineTextOne")?.optJSONArray("runs")
+                               
+                if (authorRuns != null && authorRuns.length() > 0) {
+                    for (i in 0 until authorRuns.length()) {
+                        val run = authorRuns.optJSONObject(i) ?: continue
+                        val text = run.optString("text")
+                        if (text.isNotEmpty() && text != "Podcast") {
+                            creator = text
+                            val browseId = run.optJSONObject("navigationEndpoint")
+                                ?.optJSONObject("browseEndpoint")
+                                ?.optString("browseId")
+                            if (!browseId.isNullOrEmpty()) {
+                                creatorId = browseId
+                            }
+                            break
+                        }
+                    }
+                }
+
+                // Extract thumbnail
+                val thumbnails = header.optJSONObject("thumbnail")
+                    ?.optJSONObject("musicThumbnailRenderer")
+                    ?.optJSONObject("thumbnail")
+                    ?.optJSONArray("thumbnails")
+                    ?: header.optJSONObject("thumbnail")
+                        ?.optJSONObject("croppedSquareThumbnailRenderer")
+                        ?.optJSONObject("thumbnail")
+                        ?.optJSONArray("thumbnails")
+                
+                if (thumbnails != null && thumbnails.length() > 0) {
+                    artworkUrl = getHighResArtworkUrl(thumbnails.optJSONObject(thumbnails.length() - 1)?.optString("url")) ?: artworkUrl
+                }
+            }
+
+            // Extract episodes
+            val secondaryContents = root.optJSONObject("contents")
+                ?.optJSONObject("twoColumnBrowseResultsRenderer")
+                ?.optJSONObject("secondaryContents")
+                ?.optJSONObject("sectionListRenderer")
+                ?.optJSONArray("contents")
+
+            if (secondaryContents != null) {
+                for (i in 0 until secondaryContents.length()) {
+                    val section = secondaryContents.optJSONObject(i) ?: continue
+                    val musicShelf = section.optJSONObject("musicShelfRenderer")
+                    if (musicShelf != null) {
+                        val shelfContents = musicShelf.optJSONArray("contents")
+                        if (shelfContents != null) {
+                            extractPodcastEpisodesFromShelf(shelfContents, tracks, creator, creatorId, artworkUrl)
+                        }
+                    }
+                }
+            }
+
+            return com.margelo.nitro.hyperextractor.PodcastShowDetails(
+                title = podcastTitle, 
+                creator = creator, 
+                creatorId = creatorId,
+                artworkUrl = artworkUrl, 
+                episodes = tracks.toTypedArray()
+            )
+        } catch (e: Exception) {
+            Logger.e("Parsers: Failed to parse Podcast Details", e)
+            throw ParsingException("Failed to parse Podcast Details", cause = e)
         }
     }
 }

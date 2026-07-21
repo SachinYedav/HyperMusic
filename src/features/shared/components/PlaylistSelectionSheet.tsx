@@ -171,14 +171,14 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     height: 48,
-    borderRadius: radius.lg,
+    borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     fontSize: typography.body,
   },
   createButton: {
     width: 48,
     height: 48,
-    borderRadius: radius.lg,
+    borderRadius: radius.sm,
     marginLeft: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',

@@ -12,7 +12,7 @@ import { FlashList } from '@shopify/flash-list';
 import { usePlayerStore } from '@/store';
 import { ExtractedTrack } from 'react-native-hyper-extractor';
 import { useLikedSongs, usePlaylists, useArtists, useAlbums, useHistory } from '@/features/library/hooks/useLibrary';
-import { clearHistory } from '@/features/library/services/historyService';
+import { clearHistory, deleteHistoryItem } from '@/features/library/services/historyService';
 import { useSafeDatabase } from '@/database/useSafeDatabase';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
 import { useNavigation } from '@react-navigation/native';
@@ -74,6 +74,11 @@ export function LibraryScreen() {
           track={item as ExtractedTrack}
           onPress={handleTrackPress}
           onMorePress={() => openSheet('track', item)}
+          onDelete={(track) => {
+            if (db) {
+              deleteHistoryItem(db, track.id);
+            }
+          }}
         />
       );
     }

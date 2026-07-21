@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch } from 're
 import { useTheme, typography, spacing, radius } from '@/theme';
 import { Screen } from '@/ui/Screen';
 import { useThemeStore, useSettingsStore } from '@/store';
-import { Check, Moon, Sun, Smartphone, Headphones, DownloadCloud, Trash2, Repeat, Wifi, Info, Music, Settings as SettingsIcon, ChevronRight, Handshake, Scale } from 'lucide-react-native';
+import { Check, Moon, Sun, Smartphone, Headphones, DownloadCloud, Trash2, Repeat, Wifi, Info, Music, Settings as SettingsIcon, ChevronRight, Handshake, Scale, RefreshCw } from 'lucide-react-native';
 import { AppBottomSheet } from '@/ui/AppBottomSheet';
 import { Image } from 'expo-image';
 import { Directory, Paths } from 'expo-file-system';
@@ -228,6 +228,13 @@ export function SettingsScreen() {
             hideChevron={true}
           />
           <SettingsActionRow
+            icon={RefreshCw}
+            label="App Updates"
+            onPress={() => navigation.navigate('AppUpdates')}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsActionRow
             icon={Handshake}
             label="Privacy Policy & Terms"
             onPress={() => navigation.navigate('TermsPrivacy')}
@@ -302,7 +309,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   card: {
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     overflow: 'hidden',
   },
   optionRow: {

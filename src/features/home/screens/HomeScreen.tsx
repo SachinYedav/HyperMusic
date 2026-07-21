@@ -135,6 +135,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: typography.title,
     fontWeight: 'bold',
+    paddingRight: 4,
   },
   headerTitleWrap: {
     minWidth: 126,

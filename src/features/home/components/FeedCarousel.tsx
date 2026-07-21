@@ -58,13 +58,15 @@ export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }
       navigation.navigate('PlaylistDetails', { id: item.id });
     } else if (item.type === 'artist') {
       navigation.navigate('ArtistProfile', { id: item.id });
+    } else if (item.type === 'podcast_show') {
+      navigation.navigate('PodcastDetails', { id: item.id });
     }
   }, [playTrack, navigation]);
 
   const handlePlayAll = useCallback(() => {
-    const shelfSongs = section.items.filter(i => i.type === 'song' || i.type === 'video');
+    const shelfSongs = section.items.filter((i: BrowseItem) => i.type === 'song' || i.type === 'video');
     if (shelfSongs.length > 0) {
-      const internalTracks = shelfSongs.map(i => ({
+      const internalTracks = shelfSongs.map((i: BrowseItem) => ({
         id: i.id,
         title: i.title,
         artist: i.subtitle,
@@ -77,12 +79,16 @@ export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }
   }, [section.items, playList]);
 
   // Determine if this shelf should be rendered as Quick Picks (Grid)
-  const isQuickPicks = section.items.length > 0 && section.items.every(i => i.type === 'song');
+  const isQuickPicks = section.items.length > 0 && section.items.every((i: BrowseItem) => i.type === 'song');
 
   const chunks = React.useMemo(() => isQuickPicks ? chunkArray(section.items, 4) : [], [section.items, isQuickPicks]);
 
+  const isSingleChunk = chunks.length === 1;
+  const colWidth = isSingleChunk ? width - (spacing.md * 2) : QUICK_PICK_COL_WIDTH;
+  const chunkSnapInterval = colWidth + (isSingleChunk ? 0 : spacing.md);
+
   const renderChunk = useCallback(({ item: chunk }: { item: BrowseItem[] }) => (
-    <View style={{ width: QUICK_PICK_COL_WIDTH, marginRight: spacing.md }}>
+    <View style={{ width: colWidth, marginRight: isSingleChunk ? 0 : spacing.md }}>
       {chunk.map((track) => {
         const isPlaying = activeTrack?.id === track.id && (track.type === 'song' || track.type === 'video');
         return (
@@ -123,13 +129,13 @@ export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }
         );
       })}
     </View>
-  ), [handleTrackPress, colors.text, colors.textMuted, activeTrack?.id]);
+  ), [handleTrackPress, colors.text, colors.textMuted, activeTrack?.id, colWidth, isSingleChunk]);
 
   const renderCard = useCallback(({ item }: { item: BrowseItem }) => (
     <TrackCard track={item} onPress={handleTrackPress} />
   ), [handleTrackPress]);
 
-  const isVideoShelf = section.items.length > 0 && section.items.some(i => i.type === 'video');
+  const isVideoShelf = section.items.length > 0 && section.items.some((i: BrowseItem) => i.type === 'video');
   const showPlayAll = isQuickPicks || isVideoShelf;
 
   const Header = () => (
@@ -161,11 +167,11 @@ export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }
           renderItem={renderChunk}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
-          snapToInterval={QUICK_PICK_COL_WIDTH + spacing.md}
+          snapToInterval={chunkSnapInterval}
           decelerationRate="fast"
           getItemLayout={(data, index) => ({
-            length: QUICK_PICK_COL_WIDTH + spacing.md,
-            offset: (QUICK_PICK_COL_WIDTH + spacing.md) * index,
+            length: chunkSnapInterval,
+            offset: chunkSnapInterval * index,
             index,
           })}
           initialNumToRender={2}
@@ -246,7 +252,7 @@ const styles = StyleSheet.create({
   quickPickImage: {
     width: 48,
     height: 48,
-    borderRadius: radius.sm,
+    borderRadius: radius.xs,
   },
   quickPickInfo: {
     flex: 1,

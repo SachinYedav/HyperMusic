@@ -67,6 +67,17 @@ export interface PlaylistDetails {
 }
 
 /**
+ * Represents an episodic podcast show with detailed show metadata and episode tracks.
+ */
+export interface PodcastShowDetails {
+  title: string;
+  creator: string;
+  creatorId?: string;
+  artworkUrl: string;
+  episodes: ExtractedTrack[];
+}
+
+/**
  * Represents an artist's profile catalog containing primary hero metadata and discography shelves.
  */
 export interface ArtistProfile {
@@ -95,6 +106,9 @@ export interface HyperExtractor extends HybridObject<{ ios: 'swift', android: 'k
   
   /** Traverses responsive headers and section lists to assemble playlist details. */
   getPlaylistDetails(browseId: string): Promise<PlaylistDetails>;
+  
+  /** Extracts podcast shows and their multi-row episode listings cleanly. */
+  getPodcastDetails(browseId: string): Promise<PodcastShowDetails>;
   
   /** Extracts visual headers and discography shelves for a target artist profile. */
   getArtistProfile(browseId: string): Promise<ArtistProfile>;

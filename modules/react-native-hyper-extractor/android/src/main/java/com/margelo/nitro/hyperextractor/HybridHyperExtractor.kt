@@ -127,6 +127,26 @@ class HybridHyperExtractor : HybridHyperExtractorSpec() {
     }
 
     /**
+     * Resolves comprehensive podcast show metadata and associated episode listings for a given browse identifier.
+     *
+     * @param browseId Podcast browse identifier.
+     * @return Promise resolving to a PodcastShowDetails payload.
+     */
+    override fun getPodcastDetails(browseId: String): Promise<PodcastShowDetails> {
+        val promise = Promise<PodcastShowDetails>()
+        scope.launch {
+            try {
+                val podcast = YouTubeMusicEngine.getPodcastDetails(browseId)
+                promise.resolve(podcast)
+            } catch (e: Exception) {
+                Logger.e("Bridge Error: getPodcastDetails failed", e)
+                promise.reject(e)
+            }
+        }
+        return promise
+    }
+
+    /**
      * Resolves comprehensive artist biography, discography shelves, and top tracks for a given browse identifier.
      *
      * @param browseId Artist browse identifier.
