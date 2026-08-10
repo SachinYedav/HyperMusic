@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View, Animated, Easing } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
+import * as SplashScreen from 'expo-splash-screen';
 
 interface AnimatedSplashScreenProps {
   isReady: boolean;
@@ -22,6 +23,9 @@ export const AnimatedSplashScreen: React.FC<AnimatedSplashScreenProps> = ({
   const containerScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    // Hide the native splash screen as soon as the JS one is mounted and ready
+    SplashScreen.hideAsync().catch(() => {});
+
     Animated.loop(
       Animated.timing(rotation, {
         toValue: 1,
