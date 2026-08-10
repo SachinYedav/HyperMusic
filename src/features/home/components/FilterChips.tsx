@@ -16,8 +16,8 @@ export const FilterChips: React.FC<FilterChipsProps> = ({ selectedFilter, onSele
   const { selectedLanguages, selectedGenres } = usePreferencesStore();
 
   const filters = useMemo(() => {
-    // Unique combined list with fixed base and podcasts at the end
-    const combined = ['All', ...selectedLanguages, ...selectedGenres, 'Podcasts'];
+    // Unique combined list with 'New' and 'Podcasts' immediately following All
+    const combined = ['All', 'New', 'Podcasts', ...selectedLanguages, ...selectedGenres];
     return Array.from(new Set(combined));
   }, [selectedLanguages, selectedGenres]);
 
@@ -43,7 +43,7 @@ export const FilterChips: React.FC<FilterChipsProps> = ({ selectedFilter, onSele
               {
                 backgroundColor: isSelected
                   ? colors.text
-                  : colors.surfaceMuted,
+                  : colors.background,
                 borderColor: isDark ? colors.border : '#CCC',
               }
             ]}
@@ -53,7 +53,7 @@ export const FilterChips: React.FC<FilterChipsProps> = ({ selectedFilter, onSele
                 styles.text,
                 {
                   color: isSelected
-                    ? (isDark ? colors.background : colors.white)
+                    ? colors.background
                     : colors.text,
                 }
               ]}
@@ -74,9 +74,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   chip: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: radius.sm,
+    borderWidth: 1,
   },
   text: {
     fontSize: typography.bodySm,

@@ -12,13 +12,14 @@ import { SuggestionRow } from '../components/SuggestionRow';
 import { SearchFeedback } from '../components/SearchFeedback';
 import { TrackResultCard } from '../components/TrackResultCard';
 import { CategoryCards } from '../components/CategoryCards';
+import { VoiceSearchSheet } from '../components/VoiceSearchSheet';
 import { useNativeSearch } from '../hooks/useNativeSearch';
 import { usePlayerStore } from '@/store';
 import { BrowseItem } from 'react-native-hyper-extractor';
 import { parseNetworkError } from '@/utils/errorUtils';
 import { ErrorState } from '@/ui/ErrorState';
 
-type FilterType = 'all' | 'song' | 'artist' | 'album' | 'playlist';
+type FilterType = 'all' | 'song' | 'artist' | 'album' | 'playlist' | 'video' | 'podcast' | 'podcast_show';
 
 type SearchListItem =
   | { type: 'categories' }
@@ -35,6 +36,7 @@ export function SearchScreen() {
   const inputRef = useRef<TextInput>(null);
 
   const [query, setQuery] = useState('');
+  const [isVoiceSheetVisible, setIsVoiceSheetVisible] = useState(false);
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
@@ -145,6 +147,7 @@ export function SearchScreen() {
           artist: item.result.subtitle,
           duration: 0,
           artworkUrl: item.result.artworkUrl,
+          type: item.result.type,
           artistId: item.result.type === 'artist' ? item.result.id : undefined,
         };
 
@@ -153,13 +156,19 @@ export function SearchScreen() {
             track={mappedTrack}
             onPress={() => {
               if (item.result.type === 'artist') {
-                navigation.navigate('ArtistProfile', { id: item.result.id });
+                navigation.navigate('ArtistProfile', { 
+                  id: item.result.id, 
+                  artistName: item.result.title, 
+                  artworkUrl: item.result.artworkUrl 
+                });
               } else if (item.result.type === 'album') {
                 navigation.navigate('AlbumDetails', { id: item.result.id });
               } else if (item.result.type === 'playlist') {
                 navigation.navigate('PlaylistDetails', { id: item.result.id });
+              } else if (item.result.type === 'podcast_show') {
+                navigation.navigate('PodcastDetails', { id: item.result.id });
               } else {
-                playTrack({ ...mappedTrack, url: '' });
+                playTrack({ ...mappedTrack, url: '', artwork: mappedTrack.artworkUrl, trackType: mappedTrack.type });
               }
             }}
           />
@@ -184,9 +193,9 @@ export function SearchScreen() {
         onClear={() => {
           setQuery('');
           setSubmittedQuery('');
-          setIsFocused(true);
           inputRef.current?.focus();
         }}
+        onMicPress={() => setIsVoiceSheetVisible(true)}
         onFocus={() => setIsFocused(true)}
         onBackPress={() => {
           Keyboard.dismiss();
@@ -200,7 +209,7 @@ export function SearchScreen() {
       {!!submittedQuery && !isFocused && !isSearchLoading && !isSearchError && (
         <View style={styles.filterContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScrollContent}>
-            {(['all', 'song', 'artist', 'album', 'playlist'] as const).map(filter => (
+            {(['all', 'song', 'artist', 'album', 'playlist', 'video', 'podcast', 'podcast_show'] as const).map(filter => (
               <TouchableOpacity
                 key={filter}
                 style={[
@@ -235,6 +244,12 @@ export function SearchScreen() {
           contentContainerStyle={{ paddingBottom: 170 }}
         />
       )}
+
+      <VoiceSearchSheet 
+        visible={isVoiceSheetVisible}
+        onClose={() => setIsVoiceSheetVisible(false)}
+        onResult={(text) => submitSearch(text)} 
+      />
     </Screen>
   );
 }

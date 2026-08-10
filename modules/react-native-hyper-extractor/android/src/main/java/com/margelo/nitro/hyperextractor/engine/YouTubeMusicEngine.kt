@@ -1,4 +1,4 @@
-package com.margelo.nitro.hyperextractor.engine
+﻿package com.margelo.nitro.hyperextractor.engine
 
 import com.margelo.nitro.hyperextractor.ExtractedTrack
 import com.margelo.nitro.hyperextractor.network.NetworkClient
@@ -101,20 +101,51 @@ object YouTubeMusicEngine {
      *
      * @param videoId Target YouTube video identifier.
      * @param quality Quality profile string (normal, high, data_saver).
+     * @param extractionType "audio" or "video" (default: audio)
      * @return Direct streaming URL string.
      */
-    fun getStreamUrl(videoId: String, quality: String): String {
+    fun getStreamUrl(videoId: String, quality: String, extractionType: String = "audio"): String {
         return try {
-            Logger.d("Engine: Getting stream URL for '$videoId' using NewPipeExtractor with quality '$quality'")
+            Logger.d("Engine: Getting stream URL for '$videoId', quality '$quality', type '$extractionType'")
             
             // 1. Resolve StreamInfo via NewPipe
             val videoUrl = "https://www.youtube.com/watch?v=$videoId"
             val info = org.schabi.newpipe.extractor.stream.StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
 
-            // 2. Inspect Audio Streams
-            val audioStreams = info.audioStreams
+            if (extractionType == "video" || extractionType == "podcast") {
+                // Fetch Progressive Video Streams (Audio + Video multiplexed, like 360p MP4)
+                val videoStreams = info.videoStreams
+                if (videoStreams.isNullOrEmpty()) {
+                    throw EngineException("No progressive video streams found for $videoId")
+                }
+                
+                // Fallback to lowest acceptable resolution to save bandwidth (360p ITAG 18 is ideal)
+                val selectedVideo = videoStreams.firstOrNull { it?.format?.name == "MPEG_4" && (it.resolution == "360p" || it.resolution == "480p") }
+                    ?: videoStreams.firstOrNull { it?.format?.name == "MPEG_4" }
+                    ?: videoStreams.firstOrNull()
+                    ?: throw EngineException("Failed to fallback video stream for $videoId")
+                    
+                val url = selectedVideo.content ?: throw EngineException("Stream URL is empty")
+                Logger.d("Engine: Extracted Video URL via NewPipe (Res: ${selectedVideo.resolution})")
+                return url
+            }
+
+            // Default Audio Extraction
+            var audioStreams = info.audioStreams
             if (audioStreams.isNullOrEmpty()) {
-                throw EngineException("No audio streams found for $videoId")
+                Logger.d("Engine: No audio streams found. Falling back to progressive video stream for audio playback.")
+                val videoStreams = info.videoStreams
+                if (!videoStreams.isNullOrEmpty()) {
+                    // Fallback to lowest resolution video stream just for audio
+                    val selectedVideo = videoStreams.firstOrNull { it?.format?.name == "MPEG_4" && (it.resolution == "360p" || it.resolution == "480p") }
+                        ?: videoStreams.firstOrNull { it?.format?.name == "MPEG_4" }
+                        ?: videoStreams.firstOrNull()
+                        
+                    if (selectedVideo != null && selectedVideo.content != null) {
+                        return selectedVideo.content!!
+                    }
+                }
+                throw EngineException("No audio or video streams found for $videoId")
             }
 
             // 3. Select Target Bitrate by Quality Profile
@@ -136,7 +167,7 @@ object YouTubeMusicEngine {
                 ?: throw EngineException("No audio streams found for $videoId after fallback")
 
             val url = bestAudio.content ?: throw EngineException("Stream URL is empty")
-            Logger.d("Engine: Successfully extracted URL via NewPipe (Bitrate: ${bestAudio.averageBitrate})")
+            Logger.d("Engine: Successfully extracted Audio URL via NewPipe (Bitrate: ${bestAudio.averageBitrate})")
             url
         } catch (e: Exception) {
             Logger.e("Engine: getStreamUrl failed", e)

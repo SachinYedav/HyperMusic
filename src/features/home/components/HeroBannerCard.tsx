@@ -1,11 +1,11 @@
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, Dimensions } from 'react-native';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme, spacing, radius, typography } from '@/theme';
 import { usePlayerStore } from '@/store';
 import { BrowseItem } from 'react-native-hyper-extractor';
+import { PremiumImage } from '@/ui/PremiumImage';
 
 interface HeroBannerCardProps {
   section: {
@@ -41,7 +41,7 @@ export const HeroBannerCard: React.FC<HeroBannerCardProps> = React.memo(({ secti
     } else if (featured.type === 'playlist') {
       navigation.navigate('PlaylistDetails', { id: featured.id });
     } else if (featured.type === 'artist') {
-      navigation.navigate('ArtistProfile', { id: featured.id });
+      navigation.navigate('ArtistProfile', { id: featured.id, artistName: featured.title, artworkUrl: featured.artworkUrl });
     }
   }, [playTrack, navigation]);
 
@@ -50,7 +50,7 @@ export const HeroBannerCard: React.FC<HeroBannerCardProps> = React.memo(({ secti
 
   const renderItem = useCallback(({ item }: { item: BrowseItem }) => (
     <View style={[styles.card, { width: cardWidth }]}>
-      <Image source={{ uri: item.artworkUrl }} style={styles.image} contentFit="cover" />
+      <PremiumImage source={{ uri: item.artworkUrl }} contextType={item.type as any} fallbackIconSize={48} style={styles.image} />
       <LinearGradient colors={['transparent', colors.overlayDark]} style={styles.gradient} />
       <View style={styles.content}>
         <View style={styles.textContainer}>

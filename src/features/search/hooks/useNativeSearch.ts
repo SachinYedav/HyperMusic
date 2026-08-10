@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { HyperExtractor, BrowseItem } from 'react-native-hyper-extractor';
+import { BrowseItem } from 'react-native-hyper-extractor';
+import { extractorService } from '@/services/api/extractorService';
 
 /**
  * React Query hook dispatching raw textual queries to the native hyper extractor search resolver.
@@ -9,10 +10,10 @@ import { HyperExtractor, BrowseItem } from 'react-native-hyper-extractor';
 export function useNativeSearch(query: string) {
   return useQuery({
     queryKey: ['search', query],
-    queryFn: async (): Promise<BrowseItem[]> => {
+    queryFn: async ({ signal }): Promise<BrowseItem[]> => {
       if (!query.trim()) return [];
-      const results = await HyperExtractor.search(query);
-      return results;
+      const results = await extractorService.searchTracks(query, { signal });
+      return results as BrowseItem[];
     },
     enabled: !!query.trim(),
     staleTime: 1000 * 60 * 5,

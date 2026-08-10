@@ -2,23 +2,21 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import { Screen } from '@/ui/Screen';
-import { AppConfirmModal } from '@/ui/AppConfirmModal';
 import { LibraryFilterChips } from '../components/LibraryFilterChips';
 import { LibraryListItem } from '../components/LibraryListItem';
-import { LibraryPlaylistCard } from '../components/LibraryPlaylistCard';
-import { LibraryAlbumCard } from '../components/LibraryAlbumCard';
-import { LibraryArtistRow } from '../components/LibraryArtistRow';
+import { LibraryEntityCard } from '../components/LibraryEntityCard';
 import { FlashList } from '@shopify/flash-list';
 import { usePlayerStore } from '@/store';
 import { ExtractedTrack } from 'react-native-hyper-extractor';
 import { useLikedSongs, usePlaylists, useArtists, useAlbums, useHistory } from '@/features/library/hooks/useLibrary';
-import { clearHistory, deleteHistoryItem } from '@/features/library/services/historyService';
 import { useSafeDatabase } from '@/database/useSafeDatabase';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
+import { useToastStore } from '@/store/useToastStore';
 import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { DynamicBackground } from '@/ui/DynamicBackground';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { DownloadCloud, Trash2 } from 'lucide-react-native';
+import { removeTrackFromHistory } from '@/database/queries';
+import { DownloadCloud } from 'lucide-react-native';
 
 /**
  * Central library hub aggregating offline SQLite persistence, liked tracks, user playlists, downloaded files, and heavy rotation history.
@@ -30,7 +28,6 @@ export function LibraryScreen() {
   const { openSheet } = useActionSheetStore();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [filter, setFilter] = useState<string>('Songs');
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const likedSongs = useLikedSongs();
   const playlists = usePlaylists();
@@ -46,16 +43,15 @@ export function LibraryScreen() {
       duration: track.duration,
       artwork: track.artworkUrl,
       url: (track as any).localFilePath || '',
+      trackType: (track as any).trackType || 'song',
     });
   }, [playTrack]);
 
   const keyExtractor = React.useCallback((item: any, index: number) => {
-    if (filter === 'Songs') return `song-${item.id}`;
-    if (filter === 'Artists') return `artist-${item.artist}`;
-    if (filter === 'Playlists') return `playlist-${item.id}`;
-    if (filter === 'Albums') return `album-${item.id}`;
-    if (filter === 'History') return `history-${item.id}-${index}`;
-    return index.toString();
+    if (filter === 'History') {
+      return `${item.id}-${item.lastPlayedAt}-${index}`;
+    }
+    return item.id ? `${filter}-${item.id}-${index}` : `${filter}-fallback-${index}`;
   }, [filter]);
 
   const renderItem = React.useCallback(({ item }: { item: any }) => {
@@ -76,7 +72,8 @@ export function LibraryScreen() {
           onMorePress={() => openSheet('track', item)}
           onDelete={(track) => {
             if (db) {
-              deleteHistoryItem(db, track.id);
+              removeTrackFromHistory(db, track.id);
+              useToastStore.getState().showToast('Removed from history', 'info');
             }
           }}
         />
@@ -84,21 +81,24 @@ export function LibraryScreen() {
     }
     if (filter === 'Artists') {
       return (
-        <LibraryArtistRow
-          artist={item as any}
+        <LibraryEntityCard
+          type="artist"
+          item={item}
           onPress={() => navigation.navigate('ArtistProfile', {
-            id: item.artistId || item.artist,
-            artistName: item.artist,
-            isLocal: true
+            id: item.id,
+            artistName: item.name,
+            artistThumbnail: item.avatarUrl,
+            isLocal: false
           })}
-          onMorePress={() => openSheet('artist', { ...item, isLocal: true })}
+          onMorePress={() => openSheet('artist', { ...item, isLocal: false })}
         />
       );
     }
     if (filter === 'Playlists') {
       return (
-        <LibraryPlaylistCard
-          playlist={item as any}
+        <LibraryEntityCard
+          type="playlist"
+          item={item}
           onPress={() => navigation.navigate('PlaylistDetails', {
             id: item.id,
             title: item.name
@@ -109,8 +109,9 @@ export function LibraryScreen() {
     }
     if (filter === 'Albums') {
       return (
-        <LibraryAlbumCard
-          album={item as any}
+        <LibraryEntityCard
+          type="album"
+          item={item}
           onPress={() => navigation.navigate('AlbumDetails', {
             id: item.id,
             albumTitle: item.title,
@@ -127,19 +128,7 @@ export function LibraryScreen() {
 
   return (
     <Screen disableSafeAreaBottom>
-      <View style={StyleSheet.absoluteFill}>
-        <LinearGradient
-          colors={
-            isDark
-              ? ['rgba(99, 102, 241, 0.25)', 'rgba(139, 92, 246, 0.18)', 'rgba(217, 70, 239, 0.08)', colors.background]
-              : ['rgba(99, 102, 241, 0.12)', 'rgba(139, 92, 246, 0.08)', 'rgba(217, 70, 239, 0.04)', colors.background]
-          }
-          locations={[0, 0.25, 0.5, 0.8]}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
-      </View>
+      <DynamicBackground />
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
         <View style={styles.headerRight}>
@@ -151,15 +140,6 @@ export function LibraryScreen() {
             <DownloadCloud color={colors.text} size={18} />
             <Text style={[styles.downloadsText, { color: colors.text }]}>Downloads</Text>
           </TouchableOpacity>
-          {filter === 'History' && history.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setShowClearConfirm(true)}
-              hitSlop={10}
-              style={styles.clearButton}
-            >
-              <Trash2 color={colors.text} size={18} />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
@@ -170,7 +150,7 @@ export function LibraryScreen() {
           keyExtractor={keyExtractor}
           getItemType={() => filter}
           // @ts-ignore
-          estimatedItemSize={80}
+          estimatedItemSize={filter === 'Artists' ? 88 : filter === 'Playlists' ? 220 : filter === 'Albums' ? 220 : 80}
           drawDistance={1000}
           renderItem={renderItem}
           ListEmptyComponent={
@@ -182,20 +162,6 @@ export function LibraryScreen() {
           showsVerticalScrollIndicator={false}
         />
       </View>
-
-      <AppConfirmModal
-        visible={showClearConfirm}
-        title="Clear History"
-        message="Are you sure you want to clear your entire listening history? This will reset your Heavy Rotation and recent vibes."
-        cancelText="Cancel"
-        confirmText="Clear"
-        isDestructive
-        onCancel={() => setShowClearConfirm(false)}
-        onConfirm={() => {
-          if (db) clearHistory(db);
-          setShowClearConfirm(false);
-        }}
-      />
     </Screen>
   );
 }
@@ -224,11 +190,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     backgroundColor: 'rgba(150, 150, 150, 0.15)',
-    borderRadius: radius.xl,
-  },
-  clearButton: {
-    padding: spacing.sm,
-    backgroundColor: 'rgba(255, 50, 50, 0.15)',
     borderRadius: radius.xl,
   },
   downloadsText: {

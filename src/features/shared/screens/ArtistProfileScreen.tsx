@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, spacing, typography, radius } from '@/theme';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '@/navigation/types';
@@ -12,26 +12,31 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Play, Shuffle, MoreVertical } from 'lucide-react-native';
+import { ArrowLeft, Play, Shuffle, Share2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getColors } from 'react-native-image-colors';
 import { TrackResultCard } from '../../search/components/TrackResultCard';
 import { usePlayerStore } from '@/store';
-import { BrowseItem, BrowseShelf, ExtractedTrack, HyperExtractor } from 'react-native-hyper-extractor';
+import { ExtractedTrack } from 'react-native-hyper-extractor';
 import { useQuery } from '@tanstack/react-query';
+import { extractorService } from '@/services/api/extractorService';
+import { shareContent } from '@/utils/shareUtils';
 import { FeedCarousel } from '@/features/home/components/FeedCarousel';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
 import { useSafeDatabase } from '@/database/useSafeDatabase';
 import { ErrorState } from '@/ui/ErrorState';
+import { WaveLoader } from '@/ui/WaveLoader';
+import { FlashList } from '@shopify/flash-list';
+import { getTracksByArtist } from '@/database/queries';
+import { useLibraryStore } from '@/store/useLibraryStore';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'ArtistProfile'>;
 
 const HEADER_MAX_HEIGHT = 380;
 const HEADER_MIN_HEIGHT = 90;
 
-/**
- * Entity profile workspace managing remote and offline artist catalogs, dynamic background gradients, and top track shelf rendering.
- */
+const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
+
 export function ArtistProfileScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -42,21 +47,19 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
   const [dominantColor, setDominantColor] = useState<string>(colors.border);
   const db = useSafeDatabase();
   const [localTracks, setLocalTracks] = useState<ExtractedTrack[]>([]);
+  const isSaved = useLibraryStore((state) => state.followedArtistIds.has(route.params.id));
   const isLocal = route.params.isLocal;
 
   useEffect(() => {
     if (isLocal && route.params.artistName && db) {
-      db.getAllAsync<ExtractedTrack>(
-        `SELECT * FROM Tracks WHERE (isLiked = 1 OR id IN (SELECT trackId FROM Downloads)) AND artist LIKE ?`,
-        [`%${route.params.artistName}%`]
-      ).then(setLocalTracks);
+      getTracksByArtist(db, route.params.artistName).then(setLocalTracks);
     }
   }, [isLocal, route.params.artistName, db]);
 
   const { data: remoteData, isLoading, error, refetch } = useQuery({
     queryKey: ['artist', route.params.id],
-    queryFn: async () => {
-      return await HyperExtractor.getArtistProfile(route.params.id);
+    queryFn: async ({ signal }) => {
+      return await extractorService.getArtistProfile(route.params.id, { signal });
     },
     staleTime: 1000 * 60 * 60, // 1 hour
     enabled: !isLocal,
@@ -68,6 +71,17 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
     subtitle: `${localTracks.length} Saved Songs`,
     shelves: []
   } : remoteData;
+
+  const handleToggleFollow = async () => {
+    if (!db || !artistData) return;
+    const artistName = artistData.name || route.params.artistName || 'Unknown Artist';
+    await useLibraryStore.getState().toggleArtist(db, {
+      id: route.params.id,
+      name: artistName,
+      avatarUrl: artistData.artworkUrl
+    });
+  };
+
 
   useEffect(() => {
     if (artistData?.artworkUrl) {
@@ -122,6 +136,18 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
     };
   });
 
+  const optimisticData = isLocal ? {
+    name: route.params.artistName,
+    artworkUrl: localTracks[0]?.artworkUrl || route.params.artworkUrl || '',
+    subtitle: `${localTracks.length} Saved Songs`,
+    shelves: []
+  } : {
+    name: remoteData?.name || route.params.artistName || 'Artist',
+    artworkUrl: remoteData?.artworkUrl || route.params.artworkUrl || '',
+    subtitle: remoteData?.subtitle || 'Artist',
+    shelves: remoteData?.shelves || []
+  };
+
   const handlePlayAction = (shuffle: boolean) => {
     if (isLocal) {
       if (localTracks.length > 0) {
@@ -136,9 +162,8 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
         playList(tracksToPlay as any[], 0, shuffle);
       }
     } else {
-      if (!artistData?.shelves) return;
-      // Find the first shelf that has songs/videos (usually "Top Songs")
-      const songShelf = artistData.shelves.find((shelf: any) =>
+      if (!optimisticData.shelves) return;
+      const songShelf = optimisticData.shelves.find((shelf: any) =>
         shelf.items && shelf.items.length > 0 &&
         (shelf.items[0].type === 'song' || shelf.items[0].type === 'video')
       );
@@ -147,7 +172,7 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
         const tracksToPlay = songShelf.items.map((item: any) => ({
           id: item.id,
           title: item.title,
-          artist: item.subtitle || artistData.name,
+          artist: item.subtitle || optimisticData.name,
           duration: 0,
           artwork: item.artworkUrl,
           url: ''
@@ -157,21 +182,70 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
     }
   };
 
-  if (isLoading && !isLocal) {
+  if (isLoading && !isLocal && !route.params.artistName) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.brand} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <WaveLoader />
       </View>
     );
   }
 
-  if (!artistData) {
+  if (error && !remoteData && !isLocal) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <ErrorState error={error} onRetry={refetch} />
       </View>
     );
   }
+
+  const renderHeader = () => (
+    <View style={styles.actionRow}>
+      <Pressable
+        style={[styles.followBtn, { backgroundColor: isSaved ? 'transparent' : colors.text, borderColor: isSaved ? colors.border : 'transparent', borderWidth: 1 }]}
+        onPress={handleToggleFollow}
+      >
+        <Text style={[styles.followBtnText, { color: isSaved ? colors.text : colors.background }]}>{isSaved ? 'Following' : 'Follow'}</Text>
+      </Pressable>
+      <View style={styles.playControlsContainer}>
+        <Pressable
+          hitSlop={10}
+          onPress={() => handlePlayAction(true)}
+          style={styles.shuffleIconBtn}
+        >
+          <Shuffle color={colors.text} size={22} />
+        </Pressable>
+        <Pressable
+          hitSlop={10}
+          onPress={() => handlePlayAction(false)}
+          style={[styles.playIconCircleBtn, { backgroundColor: colors.text }]}
+        >
+          <Play color={colors.background} size={28} fill={colors.background} style={{ marginLeft: 4 }} />
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderListItem = ({ item }: { item: any }) => {
+    if (isLocal) {
+      return (
+        <View style={{ paddingHorizontal: spacing.md }}>
+          <TrackResultCard
+            track={item as any}
+            onPress={() => playTrack(item as any)}
+          />
+        </View>
+      );
+    } else {
+      return <FeedCarousel section={item} />;
+    }
+  };
+  const displaySubtitle = isLocal
+    ? optimisticData.subtitle
+    : (optimisticData.subtitle && optimisticData.subtitle !== 'Artist'
+      ? (optimisticData.subtitle.toLowerCase().includes('listener') || optimisticData.subtitle.toLowerCase().includes('subscriber') || optimisticData.subtitle.toLowerCase().includes('song')
+        ? optimisticData.subtitle
+        : `${optimisticData.subtitle} monthly listeners`)
+      : 'Artist');
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -183,11 +257,13 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
           end={{ x: 0, y: 1 }}
         />
         <Animated.View style={[StyleSheet.absoluteFill, bannerOpacityStyle]}>
-          <Image
-            source={{ uri: artistData.artworkUrl }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-          />
+          {optimisticData.artworkUrl ? (
+            <Image
+              source={{ uri: optimisticData.artworkUrl }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+            />
+          ) : null}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.4)', colors.background]}
             locations={[0, 0.6, 1]}
@@ -196,73 +272,39 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
         </Animated.View>
 
         <View style={[styles.topBar, { marginTop: insets.top }]}>
-          <Pressable hitSlop={12} onPress={() => navigation.goBack()} style={[styles.iconBtn, { backgroundColor: colors.overlayLight }]}>
-            <ArrowLeft color={colors.white} size={24} />
+          <Pressable hitSlop={12} onPress={() => navigation.goBack()} style={styles.iconBtnDirect}>
+            <ArrowLeft color={colors.white} size={28} />
           </Pressable>
           <Animated.Text style={[styles.stickyTitle, titleOpacityStyle, { color: colors.white }]} numberOfLines={1}>
-            {artistData.name}
+            {optimisticData.name}
           </Animated.Text>
           <Pressable
             hitSlop={12}
-            style={[styles.iconBtn, { backgroundColor: colors.overlayLight }]}
-            onPress={() => openSheet('artist', {
-              id: route.params.id,
-              name: artistData.name,
-              coverUrl: artistData.artworkUrl,
-              isLocal: isLocal,
-              shelves: artistData.shelves
-            })}
+            style={styles.iconBtnDirect}
+            onPress={() => shareContent('artist', route.params.id, optimisticData.name || '')}
           >
-            <MoreVertical color={colors.white} size={24} />
+            <Share2 color={colors.white} size={24} />
           </Pressable>
         </View>
 
         <Animated.View style={[styles.profileInfo, bannerOpacityStyle]}>
-          <Text style={styles.artistName}>{artistData.name}</Text>
-          <Text style={[styles.subscriberCount, { color: colors.white, opacity: 0.8 }]}>{artistData.subtitle}</Text>
+          <Text style={[styles.artistName, { textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]}>{optimisticData.name}</Text>
+          <Text style={[styles.subscriberCount, { color: colors.white, opacity: 0.8, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]}>{displaySubtitle}</Text>
         </Animated.View>
       </Animated.View>
 
-      <Animated.ScrollView
+      <AnimatedFlashList
+        data={isLocal ? localTracks : optimisticData.shelves}
+        renderItem={renderListItem}
+        // @ts-ignore 
+        estimatedItemSize={isLocal ? 70 : 300}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={isLoading && !isLocal ? <WaveLoader /> : undefined}
         onScroll={onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: HEADER_MAX_HEIGHT, paddingBottom: 170 }}
         showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.actionRow}>
-          <Pressable
-            style={[styles.playBtn, { backgroundColor: colors.text }]}
-            onPress={() => handlePlayAction(false)}
-          >
-            <Play color={colors.background} size={22} fill={colors.background} />
-            <Text style={[styles.playBtnText, { color: colors.background }]}>Play All</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.shuffleBtn, { backgroundColor: colors.border }]}
-            onPress={() => handlePlayAction(true)}
-          >
-            <Shuffle color={colors.text} size={20} />
-          </Pressable>
-        </View>
-
-        <View style={{ marginTop: spacing.md }}>
-          {isLocal ? (
-            <View style={{ paddingHorizontal: spacing.md }}>
-              {localTracks.map((track) => (
-                <TrackResultCard
-                  key={track.id}
-                  track={track as any}
-                  onPress={() => playTrack(track as any)}
-                />
-              ))}
-            </View>
-          ) : (
-            artistData?.shelves?.map((shelf: any, index: number) => (
-              <FeedCarousel key={index} section={shelf} />
-            ))
-          )}
-        </View>
-      </Animated.ScrollView>
+      />
     </View>
   );
 }
@@ -285,12 +327,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     height: 56,
   },
-  iconBtn: {
+  iconBtnDirect: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
   },
   stickyTitle: {
     fontSize: typography.title,
@@ -307,8 +348,8 @@ const styles = StyleSheet.create({
   },
   artistName: {
     color: '#FFF',
-    fontSize: 42,
-    fontWeight: '900',
+    fontSize: 44,
+    fontWeight: 'bold',
     marginBottom: 4,
   },
   subscriberCount: {
@@ -318,33 +359,36 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    marginBottom: spacing.xs,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  playBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
+  followBtn: {
+    width: '50%',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     borderRadius: radius.full,
-    gap: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  playBtnText: {
-    fontSize: typography.bodyLg,
+  followBtnText: {
+    fontSize: typography.body,
     fontWeight: 'bold',
   },
-  shuffleBtn: {
-    width: 52,
-    height: 52,
+  playControlsContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 26,
+    gap: spacing.lg,
   },
-  section: {
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.md,
+  shuffleIconBtn: {
+    padding: spacing.xs,
+  },
+  playIconCircleBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: typography.title,

@@ -1,4 +1,4 @@
-package com.margelo.nitro.hyperextractor
+﻿package com.margelo.nitro.hyperextractor
 
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.hyperextractor.engine.YouTubeMusicEngine
@@ -31,13 +31,14 @@ class HybridHyperExtractor : HybridHyperExtractorSpec() {
      *
      * @param videoId Target YouTube video identifier.
      * @param quality Quality profile string (normal, high, data_saver).
+     * @param extractionType Optional media type (audio, video).
      * @return Promise resolving to the exact streaming URL string.
      */
-    override fun getStreamUrl(videoId: String, quality: String): Promise<String> {
+    override fun getStreamUrl(videoId: String, quality: String, extractionType: String?): Promise<String> {
         val promise = Promise<String>()
         scope.launch {
             try {
-                val url = YouTubeMusicEngine.getStreamUrl(videoId, quality)
+                val url = YouTubeMusicEngine.getStreamUrl(videoId, quality, extractionType ?: "audio")
                 promise.resolve(url)
             } catch (e: Exception) {
                 Logger.e("Bridge Error: getStreamUrl failed", e)

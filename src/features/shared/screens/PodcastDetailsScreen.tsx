@@ -1,49 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, LayoutAnimation } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, spacing, typography, radius } from '@/theme';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '@/navigation/types';
-import Animated, {
-  useAnimatedScrollHandler,
-  useSharedValue,
-  useAnimatedStyle,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Play, Shuffle, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getColors } from 'react-native-image-colors';
 import { TrackResultCard } from '../../search/components/TrackResultCard';
 import { usePlayerStore } from '@/store';
-import { ExtractedTrack, HyperExtractor } from 'react-native-hyper-extractor';
 import { useQuery } from '@tanstack/react-query';
-import { useActionSheetStore } from '@/store/useActionSheetStore';
-import { AnimatedEQ } from '@/ui/AnimatedEQ';
-import { ErrorState } from '@/ui/ErrorState';
+import { extractorService } from '@/services/api/extractorService';
+
 import { useSafeDatabase } from '@/database/useSafeDatabase';
+import { useToastStore } from '@/store/useToastStore';
+import { CollectionDetailsTemplate } from '@/features/shared/components/CollectionDetailsTemplate';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'PodcastDetails'>;
 
-const HEADER_MAX_HEIGHT = 350;
-const HEADER_MIN_HEIGHT = 90;
-
 export function PodcastDetailsScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { openSheet } = useActionSheetStore();
+  const db = useSafeDatabase();
+  const isSaved = false;
+
   const playList = usePlayerStore((state) => state.playList);
   const activeTrack = usePlayerStore((state) => state.activeTrack);
-  const scrollY = useSharedValue(0);
   const [dominantColor, setDominantColor] = useState<string>(colors.border);
-
-  const db = useSafeDatabase();
 
   const { data: podcastData, isLoading, error, refetch } = useQuery({
     queryKey: ['podcast', route.params.id, !!db],
-    queryFn: async () => {
-      const data = await HyperExtractor.getPodcastDetails(route.params.id);
+    queryFn: async ({ signal }) => {
+      const data = await extractorService.getPodcastDetails(route.params.id, { signal });
       return data;
     },
     staleTime: 1000 * 60 * 60, // 1 hour
@@ -66,288 +50,119 @@ export function PodcastDetailsScreen({ navigation, route }: Props) {
     }
   }, [isDark, podcastData?.artworkUrl]);
 
-  const onScroll = useAnimatedScrollHandler((event) => {
-    scrollY.value = event.contentOffset.y;
-  });
+  const optimisticData = {
+    title: podcastData?.title || route.params.name || 'Loading...',
+    artworkUrl: podcastData?.artworkUrl || route.params.coverUrl || '',
+    creator: podcastData?.creator || '',
+    creatorId: podcastData?.creatorId,
+    episodes: podcastData?.episodes || [],
+  };
 
-  const headerStyle = useAnimatedStyle(() => {
-    return {
-      height: interpolate(
-        scrollY.value,
-        [-100, 0, HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT],
-        [HEADER_MAX_HEIGHT + 100, HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
-        Extrapolation.CLAMP
-      ),
-    };
-  });
+  const mappedTracks = (optimisticData.episodes || []).map((t: any) => ({
+    ...t,
+    artwork: t.artworkUrl,
+    trackType: 'podcast',
+  }));
 
-  const imageOpacityStyle = useAnimatedStyle(() => {
-    return {
-      opacity: interpolate(
-        scrollY.value,
-        [0, HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT - 50],
-        [1, 0],
-        Extrapolation.CLAMP
-      ),
-    };
-  });
+  const handleSave = async () => {
+    useToastStore.getState().showToast('Podcast saving not supported yet', 'info');
+  };
 
-  const titleOpacityStyle = useAnimatedStyle(() => {
-    return {
-      opacity: interpolate(
-        scrollY.value,
-        [HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT - 50, HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT],
-        [0, 1],
-        Extrapolation.CLAMP
-      ),
-    };
-  });
+  const renderEpisodesHeader = () => (
+    <View style={styles.episodesHeader}>
+      <Text style={[styles.episodesTitle, { color: colors.text }]}>All Episodes</Text>
+      <Text style={[styles.episodesCount, { color: colors.textMuted }]}>{optimisticData.episodes.length || 0} episodes</Text>
+    </View>
+  );
 
-  if (isLoading) {
+  const renderTrackItem = ({ item, index }: { item: any; index: number }) => {
+    const isPlaying = activeTrack?.id === item.id;
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.brand} />
+      <View style={[styles.trackWrapper, { backgroundColor: isPlaying ? colors.overlayLight : 'transparent' }]}>
+        <View style={{ flex: 1 }}>
+          <TrackResultCard
+            track={item}
+            isPlaying={isPlaying}
+            hideEQOverlay={true}
+            onPress={() => {
+              if (optimisticData.episodes.length > 0) {
+                const mappedTracks = optimisticData.episodes.length > 0 ? optimisticData.episodes.map((t: any) => ({
+                  ...t,
+                  artwork: t.artworkUrl,
+                  trackType: 'podcast',
+                })) : [];
+                playList(mappedTracks as unknown as any[], index);
+              }
+            }}
+          />
+        </View>
       </View>
     );
-  }
-
-  if (error || !podcastData) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <ErrorState error={error} onRetry={refetch} />
-      </View>
-    );
-  }
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Animated.View style={[styles.header, headerStyle, { zIndex: 10 }]}>
-        <LinearGradient
-          colors={[dominantColor, 'transparent']}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-        />
-        <Animated.View style={[StyleSheet.absoluteFill, styles.imageContainer, imageOpacityStyle]}>
-          <Image
-            source={{ uri: podcastData.artworkUrl }}
-            style={styles.artwork}
-            contentFit="cover"
-          />
-        </Animated.View>
-
-        <View style={[styles.topBar, { marginTop: insets.top }]}>
-          <Pressable hitSlop={12} onPress={() => navigation.goBack()} style={[styles.iconBtn, { backgroundColor: colors.overlayLight }]}>
-            <ArrowLeft color={colors.white} size={24} />
-          </Pressable>
-          <Animated.Text style={[styles.stickyTitle, titleOpacityStyle, { color: colors.white }]} numberOfLines={1}>
-            {podcastData.title}
-          </Animated.Text>
-          <Pressable
-            hitSlop={12}
-            style={[styles.iconBtn, { backgroundColor: colors.overlayLight }]}
-            onPress={() => openSheet('playlist', {
-              id: route.params.id,
-              name: podcastData.title,
-              coverUrl: podcastData.artworkUrl
-            })}
-          >
-            <MoreVertical color={colors.white} size={24} />
-          </Pressable>
-        </View>
-      </Animated.View>
-
-      <Animated.ScrollView
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={{ paddingTop: HEADER_MAX_HEIGHT, paddingBottom: 170 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Podcast Info */}
-        <View style={styles.infoSection}>
-          <Text style={[styles.title, { color: colors.text }]}>{podcastData.title}</Text>
+    <CollectionDetailsTemplate
+      title={optimisticData.title}
+      artworkUrl={optimisticData.artworkUrl}
+      dominantColor={dominantColor}
+      subtitleComponent={
+        optimisticData.creator ? (
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             Podcast •{' '}
             <Text
               onPress={() => {
-                if (podcastData.creatorId) {
-                  navigation.navigate('ArtistProfile', { id: podcastData.creatorId });
+                if (optimisticData.creatorId) {
+                  navigation.navigate('ArtistProfile', { id: optimisticData.creatorId });
                 }
               }}
-              style={[{ color: colors.text }, podcastData.creatorId ? { textDecorationLine: 'underline' } : undefined]}
+              style={[{ color: colors.text }, optimisticData.creatorId ? { textDecorationLine: 'underline' } : undefined]}
             >
-              {podcastData.creator}
+              {optimisticData.creator}
             </Text>
           </Text>
-
-
-          {/* Actions */}
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[styles.playBtn, { backgroundColor: colors.text }]}
-              onPress={() => {
-                if (podcastData?.episodes && podcastData.episodes.length > 0) {
-                  playList(podcastData.episodes as unknown as any[]);
-                }
-              }}
-            >
-              <Play color={colors.background} size={22} fill={colors.background} />
-              <Text style={[styles.playBtnText, { color: colors.background }]}>Play All</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.shuffleBtn, { backgroundColor: colors.overlay }]}
-              onPress={() => {
-                if (podcastData?.episodes && podcastData.episodes.length > 0) {
-                  const shuffled = [...podcastData.episodes].sort(() => Math.random() - 0.5);
-                  playList(shuffled as unknown as any[]);
-                }
-              }}
-            >
-              <Shuffle color={colors.text} size={20} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Episodes Header */}
-        <View style={styles.episodesHeader}>
-          <Text style={[styles.episodesTitle, { color: colors.text }]}>All Episodes</Text>
-          <Text style={[styles.episodesCount, { color: colors.textMuted }]}>{podcastData.episodes?.length || 0} episodes</Text>
-        </View>
-
-        {/* Episodes List */}
-        <View style={styles.trackList}>
-          {podcastData.episodes?.map((track: any, index: number) => {
-            const isPlaying = activeTrack?.id === track.id;
-            return (
-              <View key={track.id} style={[styles.trackWrapper, { backgroundColor: isPlaying ? colors.overlayLight : 'transparent' }]}>
-                <View style={{ flex: 1 }}>
-                  <TrackResultCard
-                    track={track}
-                    isPlaying={isPlaying}
-                    onPress={() => {
-                      if (podcastData?.episodes) {
-                        playList(podcastData.episodes as unknown as any[], index);
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      </Animated.ScrollView>
-    </View>
+        ) : null
+      }
+      tracks={optimisticData.episodes}
+      mappedTracks={mappedTracks}
+      isSaved={isSaved || false}
+      onSave={handleSave}
+      collectionId={route.params.id}
+      collectionType="podcast"
+      isLoading={isLoading}
+      error={error}
+      onRetry={refetch}
+      renderItem={renderTrackItem}
+      ListHeaderComponent={renderEpisodesHeader()}
+      onPlay={(mapped) => playList(mapped)}
+      onShuffle={(mapped) => playList(mapped, 0, true)}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    overflow: 'hidden',
-  },
-  imageContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-  },
-  artwork: {
-    width: 220,
-    height: 220,
-    borderRadius: radius.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    height: 56,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.full,
-  },
-  stickyTitle: {
-    fontSize: typography.title,
-    fontWeight: 'bold',
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: spacing.md,
-  },
-  infoSection: {
-    padding: spacing.lg,
-  },
-  title: {
-    fontSize: typography.header,
-    fontWeight: '900',
-    marginBottom: spacing.xs,
-  },
   subtitle: {
-    fontSize: typography.body,
-    fontWeight: '600',
-    marginBottom: spacing.lg,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  playBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-    borderRadius: radius.full,
-    gap: spacing.sm,
-  },
-  playBtnText: {
-    fontSize: typography.bodyLg,
-    fontWeight: 'bold',
-  },
-  shuffleBtn: {
-    width: 52,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.full,
+    fontSize: typography.bodySm,
+    marginTop: spacing.xs,
   },
   episodesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   episodesTitle: {
-    fontSize: typography.title,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   episodesCount: {
     fontSize: typography.bodySm,
   },
-  trackList: {
-    paddingHorizontal: 0,
-  },
   trackWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
 });

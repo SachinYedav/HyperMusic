@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated as RNAnimated } from 'react-native';
 import { Image } from 'expo-image';
 import { useTheme, spacing, radius, typography } from '@/theme';
+import { useToastStore } from '@/store/useToastStore';
 import { ExtractedTrack } from 'react-native-hyper-extractor';
 import { MoreVertical, Trash2 } from 'lucide-react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -93,9 +94,7 @@ export const LibraryListItem: React.FC<LibraryListItemProps> = React.memo(({ tra
           if (onMorePress) {
             onMorePress(track);
           } else {
-            import('react-native').then(({ Alert }) => {
-              Alert.alert('Options', `Remove ${track.title} from Liked or Add to Playlist? (WIP)`);
-            });
+            useToastStore.getState().showToast('More options coming soon', 'info');
           }
         }}
       >

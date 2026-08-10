@@ -5,20 +5,23 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { downloadService } from '@/features/library/services/downloadService';
 import { useSafeDatabase } from '@/database/useSafeDatabase';
-import TrackPlayer from 'react-native-track-player';
-import { toggleLike, deletePlaylist, saveRemotePlaylist, saveRemoteAlbum, deleteAlbum } from '@/features/library/services/libraryService';
+import { DynamicArtworkFallback } from '@/ui/DynamicArtworkFallback';
 import { shareContent } from '@/utils/shareUtils';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
 import { usePlaylistSelectionStore } from '@/store/usePlaylistSelectionStore';
+import { useArtistSelectionStore } from '@/store/useArtistSelectionStore';
 import { usePlayerStore } from '@/store';
-import { usePlaylists, useAlbums, useLikedSongs, useDownloadedSongs } from '@/features/library/hooks/useLibrary';
+import { useToastStore } from '@/store/useToastStore';
+import { useDownloadedSongs } from '@/features/library/hooks/useLibrary';
+import { useLibraryStore } from '@/store/useLibraryStore';
 import { useDownloadStore } from '@/features/library/store/useDownloadStore';
 import { useTheme, spacing, radius, typography } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { extractorService } from '@/services/api/extractorService';
 import {
   Play, ListPlus, PlusCircle, Heart, Download,
-  User, Disc, Share2, Trash2, CheckCircle2
+  User, Disc, Share2, Trash2, CheckCircle2, Shuffle, UserPlus
 } from 'lucide-react-native';
 
 /**
@@ -35,15 +38,13 @@ export function GlobalActionSheet() {
   const db = useSafeDatabase();
 
   // Dynamically track saved state
-  const savedPlaylists = usePlaylists();
-  const savedAlbums = useAlbums();
-  const likedSongs = useLikedSongs();
   const downloadedSongs = useDownloadedSongs();
   const activeDownloads = useDownloadStore(state => state.activeDownloads);
 
-  const isPlaylistSaved = data ? savedPlaylists.some(p => p.id === data.id) : false;
-  const isAlbumSaved = data ? savedAlbums.some(a => a.id === data.id) : false;
-  const isTrackLiked = data ? likedSongs.some(s => s.id === data.id) : false;
+  const isPlaylistSaved = useLibraryStore(s => data ? s.savedPlaylistIds.has(data.id) : false);
+  const isAlbumSaved = useLibraryStore(s => data ? s.savedAlbumIds.has(data.id) : false);
+  const isTrackLiked = useLibraryStore(s => data ? s.likedTrackIds.has(data.id) : false);
+  const isArtistSaved = useLibraryStore(s => data ? s.followedArtistIds.has(data.id || data.artistId || '') : false);
   const isTrackDownloaded = data ? downloadedSongs.some(s => s.id === data.id) : false;
   const activeDownloadState = (contextType === 'track' && data) ? activeDownloads[data.id] : null;
 
@@ -114,31 +115,42 @@ export function GlobalActionSheet() {
     let artwork: any = null;
 
     if (contextType === 'track') {
-      title = data.title;
-      subtitle = data.artist;
+      title = data.title || data.name || '';
+      subtitle = data.artist || data.subtitle || '';
+      if (data.album && !subtitle.includes(data.album)) {
+        subtitle += ` • ${data.album}`;
+      }
       artwork = data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
     } else if (contextType === 'playlist') {
-      title = data.name;
-      subtitle = 'Playlist';
+      title = data.title || data.name || '';
+      subtitle = data.subtitle || 'Playlist';
       artwork = data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
     } else if (contextType === 'album') {
-      title = data.title || data.name;
-      subtitle = data.artist || 'Album';
+      title = data.title || data.name || '';
+      subtitle = data.subtitle || data.artist || 'Album';
       artwork = data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
     } else if (contextType === 'artist') {
-      title = data.artist || data.name;
-      subtitle = 'Artist';
-      artwork = data.avatar || data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
+      title = data.title || data.name || data.artist || '';
+      subtitle = data.subscriberCount || data.subtitle || 'Artist';
+      artwork = data.avatarUrl || data.avatar || data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
+    } else if (contextType === 'podcast' || contextType === 'podcast_show') {
+      title = data.title || data.name || '';
+      subtitle = data.artist || data.creator || data.subtitle || (contextType === 'podcast' ? 'Podcast Episode' : 'Podcast Show');
+      artwork = data.artwork || data.artworkUrl || data.thumbnail || data.image || data.coverUrl;
     }
 
     return (
       <View style={styles.headerContainer}>
-        <Image
-          source={artwork || require('../../../../assets/default-artwork.png')}
-          style={[styles.headerArtwork, { backgroundColor: colors.highlight }]}
-          contentFit="cover"
-          transition={200}
-        />
+        {artwork ? (
+          <Image
+            source={artwork}
+            style={[styles.headerArtwork, { backgroundColor: colors.highlight }]}
+            contentFit="cover"
+            transition={200}
+          />
+        ) : (
+          <DynamicArtworkFallback contextType={contextType as any} style={[styles.headerArtwork, { backgroundColor: colors.highlight }]} iconSize={24} />
+        )}
         <View style={styles.headerTextContainer}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
           <Text style={[styles.headerSubtitle, { color: colors.textMuted }]} numberOfLines={1}>{subtitle}</Text>
@@ -160,7 +172,12 @@ export function GlobalActionSheet() {
 
   const handlePlayNext = async () => {
     if (contextType === 'track' && data) {
-      usePlayerStore.getState().insertNext(data as any);
+      if (isAlreadyInQueue) {
+        useToastStore.getState().showToast('Already in Queue', 'info');
+      } else {
+        usePlayerStore.getState().insertNext(data as any);
+        useToastStore.getState().showToast(`Added "${data.title}" to play next`, 'success');
+      }
     }
     isClosingRef.current = true;
     bottomSheetRef.current?.close();
@@ -169,7 +186,12 @@ export function GlobalActionSheet() {
 
   const handleAddToQueue = async () => {
     if (contextType === 'track' && data) {
-      usePlayerStore.getState().appendToQueue(data as any);
+      if (isAlreadyInQueue) {
+        useToastStore.getState().showToast('Already in Queue', 'info');
+      } else {
+        usePlayerStore.getState().appendToQueue(data as any);
+        useToastStore.getState().showToast(`Added "${data.title}" to queue`, 'success');
+      }
     }
     isClosingRef.current = true;
     bottomSheetRef.current?.close();
@@ -177,10 +199,12 @@ export function GlobalActionSheet() {
   };
 
   const handleToggleLike = async () => {
-    if (!db || !data || contextType !== 'track' || processingAction) return;
-    setProcessingAction('like');
-    await toggleLike(db, data);
-    setProcessingAction(null);
+    if (!db || !data || contextType !== 'track') return;
+    await useLibraryStore.getState().toggleTrackLike(db, data);
+    useToastStore.getState().showToast(!isTrackLiked ? 'Added to Liked Songs' : 'Removed from Liked Songs', !isTrackLiked ? 'liked' : 'info');
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
   };
 
   const handleAddToPlaylist = () => {
@@ -192,6 +216,160 @@ export function GlobalActionSheet() {
         usePlaylistSelectionStore.getState().openSheet(data as any);
       }, 50);
     }
+  };
+
+  const handleDownloadList = (type: 'playlist' | 'album' | 'podcast', id: string, initialTracks?: any[]) => {
+    if (!db) return;
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
+
+    setTimeout(async () => {
+      useToastStore.getState().showToast(`Fetching ${type} tracks...`, 'info');
+      const tracks = await fetchTracksIfMissing(type, id, initialTracks);
+
+      if (tracks && tracks.length > 0) {
+        await downloadService.startBatchDownload(db, tracks);
+      } else {
+        useToastStore.getState().showToast('No tracks available to download', 'error');
+      }
+    }, 200);
+  };
+
+  const handleToggleArtistSaved = async () => {
+    if (!db || !data) return;
+    const artistId = data.id || data.artistId || data.browseId;
+    const name = data.title || data.name || data.artist;
+    const avatarUrl = data.avatarUrl || data.avatar || data.artworkUrl || data.coverUrl || data.thumbnail;
+
+    if (artistId && name) {
+      await useLibraryStore.getState().toggleArtist(db, { id: artistId, name, avatarUrl });
+      useToastStore.getState().showToast(isArtistSaved ? 'Artist unfollowed' : 'Artist followed', 'success');
+    }
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
+  };
+
+
+  const fetchTracksIfMissing = async (type: 'playlist' | 'album' | 'podcast', id: string, providedTracks?: any[]) => {
+    let tracksToProcess = providedTracks && providedTracks.length > 0 ? providedTracks : [];
+
+    if (tracksToProcess.length === 0) {
+      if (data?.isLocal) {
+        if (db) {
+          if (type === 'playlist') {
+            const res = await db.getAllAsync(`
+              SELECT t.* FROM Tracks t 
+              JOIN PlaylistTracks pt ON t.id = pt.trackId 
+              WHERE pt.playlistId = ? ORDER BY pt.order_index ASC
+            `, [id]);
+            tracksToProcess = res || [];
+          } else if (type === 'album') {
+            const res = await db.getAllAsync(`
+              SELECT t.* FROM Tracks t 
+              JOIN AlbumTracks at ON t.id = at.trackId 
+              WHERE at.albumId = ? ORDER BY at.order_index ASC
+            `, [id]);
+            tracksToProcess = res || [];
+          }
+        }
+      } else {
+        try {
+          if (type === 'playlist') {
+            const details = await extractorService.getPlaylistDetails(id);
+            tracksToProcess = details.tracks || [];
+          } else if (type === 'album') {
+            const details = await extractorService.getAlbumDetails(id);
+            tracksToProcess = details.tracks || [];
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    const contextArtwork = data?.artwork || data?.artworkUrl || data?.coverUrl || data?.image || data?.thumbnail;
+
+    return tracksToProcess.map((t: any) => ({
+      ...t,
+      artwork: t.artwork || t.artworkUrl || t.thumbnails?.[0]?.url || contextArtwork,
+      trackType: t.trackType || 'song'
+    }));
+  };
+
+  const handlePlayList = (type: 'playlist' | 'album' | 'podcast', id: string, initialTracks?: any[]) => {
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
+
+    setTimeout(async () => {
+      useToastStore.getState().showToast(`Loading ${type}...`, 'info');
+      const tracks = await fetchTracksIfMissing(type, id, initialTracks);
+
+      if (tracks && tracks.length > 0) {
+        const safeTracks = tracks.slice(0, 100); // Safe limit
+        usePlayerStore.getState().playList(safeTracks);
+      } else {
+        useToastStore.getState().showToast('No tracks available', 'error');
+      }
+    }, 200);
+  };
+
+  const handleShuffleList = (type: 'playlist' | 'album' | 'podcast', id: string, initialTracks?: any[]) => {
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
+
+    setTimeout(async () => {
+      useToastStore.getState().showToast(`Loading ${type}...`, 'info');
+      const tracks = await fetchTracksIfMissing(type, id, initialTracks);
+
+      if (tracks && tracks.length > 0) {
+        const safeTracks = tracks.slice(0, 100); // Safe limit
+        usePlayerStore.getState().playList(safeTracks, 0, true);
+      } else {
+        useToastStore.getState().showToast('No tracks available', 'error');
+      }
+    }, 200);
+  };
+
+  const handlePlayNextList = (type: 'playlist' | 'album' | 'podcast', id: string, initialTracks?: any[]) => {
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
+
+    setTimeout(async () => {
+      useToastStore.getState().showToast(`Loading ${type}...`, 'info');
+      const tracks = await fetchTracksIfMissing(type, id, initialTracks);
+
+      if (tracks && tracks.length > 0) {
+        const safeTracks = tracks.slice(0, 50); // Aggressive limit to prevent queue bloat
+        usePlayerStore.getState().insertListNext(safeTracks);
+        useToastStore.getState().showToast(`Added ${safeTracks.length} tracks to play next`, 'success');
+      } else {
+        useToastStore.getState().showToast('No tracks available', 'error');
+      }
+    }, 200);
+  };
+
+  const handleAddListToQueue = (type: 'playlist' | 'album' | 'podcast', id: string, initialTracks?: any[]) => {
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
+
+    setTimeout(async () => {
+      useToastStore.getState().showToast(`Loading ${type}...`, 'info');
+      const tracks = await fetchTracksIfMissing(type, id, initialTracks);
+
+      if (tracks && tracks.length > 0) {
+        const safeTracks = tracks.slice(0, 50); // Aggressive limit to prevent queue bloat
+        usePlayerStore.getState().appendTracks(safeTracks);
+        useToastStore.getState().showToast(`Added ${safeTracks.length} tracks to queue`, 'success');
+      } else {
+        useToastStore.getState().showToast('No tracks available', 'error');
+      }
+    }, 200);
   };
 
   const handleShare = async () => {
@@ -212,60 +390,134 @@ export function GlobalActionSheet() {
   };
 
   const handleSavePlaylist = async () => {
-    if (!db || contextType !== 'playlist' || !data || processingAction) return;
-    setProcessingAction('savePlaylist');
-    await saveRemotePlaylist(db, data.id, data.name || data.title, data.coverUrl || data.artworkUrl);
-    setProcessingAction(null);
+    if (!db || contextType !== 'playlist' || !data) return;
+    await useLibraryStore.getState().togglePlaylist(db, data.id, data.name || data.title, data.coverUrl || data.artworkUrl);
+    useToastStore.getState().showToast({
+      message: 'Playlist saved to library',
+      type: 'success',
+      action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'LibraryMain' }) }
+    });
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
   };
 
   const handleDeletePlaylist = async () => {
-    if (!db || contextType !== 'playlist' || !data || processingAction) return;
-    setProcessingAction('deletePlaylist');
-    await deletePlaylist(db, data.id);
-    setProcessingAction(null);
+    if (!db || contextType !== 'playlist' || !data) return;
+    await useLibraryStore.getState().togglePlaylist(db, data.id, data.name || data.title, data.coverUrl || data.artworkUrl);
+    useToastStore.getState().showToast('Playlist removed', 'info');
     isClosingRef.current = true;
     bottomSheetRef.current?.close();
     closeSheet();
   };
 
   const handleSaveAlbum = async () => {
-    if (!db || contextType !== 'album' || !data || processingAction) return;
-    setProcessingAction('saveAlbum');
-    await saveRemoteAlbum(db, data.id, data.title || data.name, data.artist, data.coverUrl || data.artworkUrl);
-    setProcessingAction(null);
+    if (!db || contextType !== 'album' || !data) return;
+    await useLibraryStore.getState().toggleAlbum(db, data.id, data.title || data.name, data.artist, data.coverUrl || data.artworkUrl);
+    useToastStore.getState().showToast({
+      message: 'Album saved to library',
+      type: 'success',
+      action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'LibraryMain' }) }
+    });
+    isClosingRef.current = true;
+    bottomSheetRef.current?.close();
+    closeSheet();
   };
 
   const handleDeleteAlbum = async () => {
-    if (!db || contextType !== 'album' || !data || processingAction) return;
-    setProcessingAction('deleteAlbum');
-    await deleteAlbum(db, data.id);
-    setProcessingAction(null);
+    if (!db || contextType !== 'album' || !data) return;
+    await useLibraryStore.getState().toggleAlbum(db, data.id, data.title || data.name, data.artist, data.coverUrl || data.artworkUrl);
+    useToastStore.getState().showToast('Album removed', 'info');
     isClosingRef.current = true;
     bottomSheetRef.current?.close();
     closeSheet();
   };
 
   const handleGoToArtist = () => {
-    if (contextType === 'track' && data && data.artistId) {
-      navigation.navigate('ArtistProfile', {
-        id: data.artistId,
-        artistName: data.artist,
-        artistThumbnail: data.artworkUrl
-      });
+    if (data?.artists && data.artists.length > 1) {
+      isClosingRef.current = true;
+      bottomSheetRef.current?.close();
+      closeSheet();
+      setTimeout(() => {
+        useArtistSelectionStore.getState().openSheet(data.artists);
+      }, 50);
+      return;
+    }
+
+    const artistId = (data?.artists && data.artists.length === 1)
+      ? data.artists[0].id
+      : (data?.artistId || (contextType === 'artist' ? data?.id : undefined));
+
+    const name = (data?.artists && data.artists.length === 1)
+      ? data.artists[0].name
+      : (contextType === 'artist' ? (data?.title || data?.name) : (data?.artist || data?.name));
+
+    if (artistId) {
+      isClosingRef.current = true;
+      bottomSheetRef.current?.close();
+      closeSheet();
+      setTimeout(() => {
+        navigation.navigate('ArtistProfile', {
+          id: artistId,
+          artistName: name,
+          artworkUrl: data?.artworkUrl || data?.coverUrl || data?.avatar
+        });
+      }, 50);
+    } else {
+      useToastStore.getState().showToast('Artist information unavailable', 'error');
+      isClosingRef.current = true;
+      bottomSheetRef.current?.close();
+      closeSheet();
+    }
+  };
+
+  const handleGoToAlbum = () => {
+    if (contextType === 'track' && data) {
+      if (data.albumId) {
+        navigation.navigate('AlbumDetails', {
+          id: data.albumId,
+          albumTitle: data.album,
+          artistName: data.artist
+        });
+      } else {
+        useToastStore.getState().showToast('Album information unavailable', 'error');
+      }
     }
     isClosingRef.current = true;
     bottomSheetRef.current?.close();
     closeSheet();
   };
 
-  const handleGoToAlbum = () => {
-    if (contextType === 'track' && data && data.albumId) {
-      navigation.navigate('AlbumDetails', {
-        id: data.albumId,
-        albumTitle: data.album,
-        artistName: data.artist
+  const handleDownload = () => {
+    if (!db || contextType !== 'track' || !data) return;
+
+    if (isTrackDownloaded) {
+      useToastStore.getState().showToast('Already downloaded', 'info');
+    } else if (activeDownloadState) {
+      if (activeDownloadState.status === 'error') {
+        useDownloadStore.getState().removeDownload(data.id);
+        downloadService.startDownload(db, data as any);
+        useToastStore.getState().showToast({
+          message: 'Retrying download...',
+          type: 'info',
+          action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'DownloadsScreen' }) }
+        });
+      } else {
+        useToastStore.getState().showToast({
+          message: 'Download in progress...',
+          type: 'info',
+          action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'DownloadsScreen' }) }
+        });
+      }
+    } else {
+      downloadService.startDownload(db, data as any);
+      useToastStore.getState().showToast({
+        message: 'Downloading...',
+        type: 'info',
+        action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'DownloadsScreen' }) }
       });
     }
+
     isClosingRef.current = true;
     bottomSheetRef.current?.close();
     closeSheet();
@@ -273,41 +525,23 @@ export function GlobalActionSheet() {
 
   const renderOptions = () => {
     if (contextType === 'track') {
+      const downloadLabel = isTrackDownloaded ? "Downloaded" : activeDownloadState ? (activeDownloadState.status === 'error' ? "Retry Download" : `Downloading ${Math.round(activeDownloadState.progress)}%`) : "Download";
+      const downloadIcon = isTrackDownloaded ? CheckCircle2 : Download;
+      const downloadColor = isTrackDownloaded ? colors.success :
+        activeDownloadState ? (activeDownloadState.status === 'error' ? colors.error : colors.brand) :
+          colors.text;
+
       return (
         <>
-          {!isCurrentlyPlaying && !isAlreadyInQueue && renderActionRow(Play, "Play Next", handlePlayNext)}
-          {!isCurrentlyPlaying && !isAlreadyInQueue && renderActionRow(ListPlus, "Add to Queue", handleAddToQueue)}
-          {!isCurrentlyPlaying && isAlreadyInQueue && renderActionRow(CheckCircle2, "Already in Queue", () => { }, false, true, colors.brand)}
+          {renderActionRow(Play, "Play Next", handlePlayNext)}
+          {renderActionRow(ListPlus, "Add to Queue", handleAddToQueue)}
           {renderActionRow(PlusCircle, "Add to Playlist", handleAddToPlaylist)}
           {renderActionRow(Heart, isTrackLiked ? "Unlike" : "Like", handleToggleLike, processingAction === 'like', false, isTrackLiked ? colors.brand : colors.text, isTrackLiked ? colors.brand : 'none')}
 
-          {isTrackDownloaded ? (
-            renderActionRow(CheckCircle2, "Downloaded", () => { }, false, true, colors.brand)
-          ) : activeDownloadState ? (
-            activeDownloadState.status === 'error' ? (
-              renderActionRow(Download, "Retry Download", () => {
-                if (!db) return;
-                useDownloadStore.getState().removeDownload(data.id);
-                downloadService.startDownload(db, data as any);
-                isClosingRef.current = true;
-                bottomSheetRef.current?.close();
-                closeSheet();
-              }, false, false, colors.brand)
-            ) : (
-              renderActionRow(Download, `Downloading ${Math.round(activeDownloadState.progress)}%`, () => { }, true, true, colors.brand)
-            )
-          ) : (
-            renderActionRow(Download, "Download", () => {
-              if (!db) return;
-              downloadService.startDownload(db, data as any);
-              isClosingRef.current = true;
-              bottomSheetRef.current?.close();
-              closeSheet();
-            })
-          )}
+          {renderActionRow(downloadIcon, downloadLabel, handleDownload, !!(activeDownloadState && activeDownloadState.status !== 'error'), false, downloadColor)}
 
-          {!!data.artistId && renderActionRow(User, "Go to Artist", handleGoToArtist)}
-          {!!data.albumId && renderActionRow(Disc, "Go to Album", handleGoToAlbum)}
+          {renderActionRow(User, "Go to Artist", handleGoToArtist)}
+          {renderActionRow(Disc, "Go to Album", handleGoToAlbum)}
           {renderActionRow(Share2, "Share", handleShare)}
         </>
       );
@@ -315,14 +549,11 @@ export function GlobalActionSheet() {
       const isLocal = !!data?.isLocal || isPlaylistSaved;
       return (
         <>
-          {renderActionRow(Play, "Play All", () => {
-            if (data?.tracks?.length > 0) {
-              usePlayerStore.getState().playList(data.tracks);
-            }
-            isClosingRef.current = true;
-            bottomSheetRef.current?.close();
-            closeSheet();
-          })}
+          {renderActionRow(Play, "Play All", () => handlePlayList('playlist', data.id, data.tracks))}
+          {renderActionRow(Shuffle, "Shuffle Play", () => handleShuffleList('playlist', data.id, data.tracks))}
+          {renderActionRow(ListPlus, "Play Next", () => handlePlayNextList('playlist', data.id, data.tracks))}
+          {renderActionRow(ListPlus, "Add to Queue", () => handleAddListToQueue('playlist', data.id, data.tracks))}
+          {renderActionRow(Download, "Download Offline", () => handleDownloadList(contextType as any, data.id, data.tracks))}
           {renderActionRow(Share2, "Share", handleShare)}
           {isLocal
             ? renderActionRow(Trash2, "Remove Playlist", handleDeletePlaylist, processingAction === 'deletePlaylist')
@@ -334,14 +565,12 @@ export function GlobalActionSheet() {
       const isLocal = !!data?.isLocal || isAlbumSaved;
       return (
         <>
-          {renderActionRow(Play, "Play Album", () => {
-            if (data?.tracks?.length > 0) {
-              usePlayerStore.getState().playList(data.tracks);
-            }
-            isClosingRef.current = true;
-            bottomSheetRef.current?.close();
-            closeSheet();
-          })}
+          {renderActionRow(Play, "Play Album", () => handlePlayList('album', data.id, data.tracks))}
+          {renderActionRow(Shuffle, "Shuffle Play", () => handleShuffleList('album', data.id, data.tracks))}
+          {renderActionRow(ListPlus, "Play Next", () => handlePlayNextList('album', data.id, data.tracks))}
+          {renderActionRow(ListPlus, "Add to Queue", () => handleAddListToQueue('album', data.id, data.tracks))}
+          {renderActionRow(Download, "Download Offline", () => handleDownloadList(contextType as any, data.id, data.tracks))}
+          {renderActionRow(User, "View Artist", handleGoToArtist)}
           {renderActionRow(Share2, "Share", handleShare)}
           {isLocal
             ? renderActionRow(Trash2, "Remove Album", handleDeleteAlbum, processingAction === 'deleteAlbum')
@@ -352,46 +581,30 @@ export function GlobalActionSheet() {
     } else if (contextType === 'artist') {
       return (
         <>
-          {renderActionRow(Play, "Play Artist", async () => {
-            isClosingRef.current = true;
-            bottomSheetRef.current?.close();
-            closeSheet();
-            if (data?.isLocal && db) {
-              const artistQueryName = data.name || data.artist;
-              if (artistQueryName) {
-                const tracks = await db.getAllAsync<any>(
-                  `SELECT * FROM Tracks WHERE (isLiked = 1 OR id IN (SELECT trackId FROM Downloads)) AND artist LIKE ?`,
-                  [`%${artistQueryName}%`]
-                );
-                if (tracks && tracks.length > 0) {
-                  usePlayerStore.getState().playList(tracks.map((t: any) => ({
-                    id: t.id,
-                    title: t.title,
-                    artist: t.artist,
-                    duration: t.duration || 0,
-                    artwork: t.artworkUrl,
-                    url: t.localFilePath || ''
-                  })));
-                }
-              }
-            } else if (data?.shelves) {
-              const songShelf = data.shelves.find((shelf: any) =>
-                shelf.items && shelf.items.length > 0 &&
-                (shelf.items[0].type === 'song' || shelf.items[0].type === 'video')
-              );
-              if (songShelf) {
-                const tracksToPlay = songShelf.items.map((item: any) => ({
-                  id: item.id,
-                  title: item.title,
-                  artist: item.artists?.[0]?.name || data.name || 'Unknown Artist',
-                  duration: item.duration || 0,
-                  artwork: item.thumbnails?.[0]?.url || data.coverUrl || '',
-                  url: ''
-                }));
-                usePlayerStore.getState().playList(tracksToPlay);
-              }
-            }
-          })}
+          {renderActionRow(User, "View Profile", handleGoToArtist)}
+          {renderActionRow(UserPlus, isArtistSaved ? "Unfollow Artist" : "Follow Artist", handleToggleArtistSaved, processingAction === 'saveArtist')}
+          {renderActionRow(Share2, "Share", handleShare)}
+        </>
+      );
+    } else if (contextType === 'podcast') {
+      const downloadLabel = isTrackDownloaded ? "Downloaded" : activeDownloadState ? (activeDownloadState.status === 'error' ? "Retry Download" : `Downloading ${Math.round(activeDownloadState.progress)}%`) : "Download";
+      const downloadIcon = isTrackDownloaded ? CheckCircle2 : Download;
+      const downloadColor = isTrackDownloaded ? colors.success :
+        activeDownloadState ? (activeDownloadState.status === 'error' ? colors.error : colors.brand) :
+          colors.text;
+
+      return (
+        <>
+          {renderActionRow(Play, "Play Next", handlePlayNext)}
+          {renderActionRow(ListPlus, "Add to Queue", handleAddToQueue)}
+          {renderActionRow(downloadIcon, downloadLabel, handleDownload, !!(activeDownloadState && activeDownloadState.status !== 'error'), false, downloadColor)}
+          {renderActionRow(Share2, "Share", handleShare)}
+        </>
+      );
+    } else if (contextType === 'podcast_show') {
+      return (
+        <>
+          {renderActionRow(Play, "Play Latest", () => handlePlayList('podcast', data.id, data.episodes))}
           {renderActionRow(Share2, "Share", handleShare)}
         </>
       );
@@ -412,7 +625,7 @@ export function GlobalActionSheet() {
       detached={true}
       containerStyle={{ zIndex: 9999, elevation: 9999 }}
       bottomInset={insets.bottom + spacing.md}
-      style={{ marginHorizontal: spacing.sm}}
+      style={{ marginHorizontal: spacing.sm }}
       onChange={handleSheetChanges}
       backdropComponent={renderBackdrop}
       backgroundStyle={{

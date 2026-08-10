@@ -1,6 +1,7 @@
 package com.margelo.nitro.hyperextractor.engine
 
 import com.margelo.nitro.hyperextractor.ExtractedTrack
+import com.margelo.nitro.hyperextractor.ExtractedEntity
 import com.margelo.nitro.hyperextractor.errors.ParsingException
 import org.json.JSONException
 import org.json.JSONObject
@@ -188,7 +189,8 @@ object Parsers {
                         }
 
                         if (id.isNotEmpty()) {
-                            items.add(BrowseItem(id = id, type = type, title = title, subtitle = subtitle, artworkUrl = artworkUrl, artistId = null, albumId = null))
+                            items.add(BrowseItem(id = id, type = type, title = title, subtitle = subtitle, artworkUrl = artworkUrl, artistId = null, album = null, albumId = null, artists = emptyArray()
+                ))
                         }
                     }
                 }
@@ -290,8 +292,7 @@ object Parsers {
                     title = title,
                     subtitle = subtitle,
                     artworkUrl = artworkUrl,
-                    artistId = null,
-                    albumId = null
+                    artistId = null, album = null, albumId = null, artists = emptyArray()
                 )
                 items.add(browseItem)
             } catch (e: Exception) {
@@ -371,8 +372,10 @@ object Parsers {
                     ?.optJSONArray("runs")
                 
                 var artistBuilder = StringBuilder()
-                var artistId: String? = null
-                var albumId: String? = null
+                                    var artistId: String? = null
+                                    var albumId: String? = null
+                                    var albumName: String? = null
+                                    val extractedArtists = mutableListOf<ExtractedEntity>()
 
                 if (artistColRuns != null) {
                     for (j in 0 until artistColRuns.length()) {
@@ -384,10 +387,14 @@ object Parsers {
                             ?.optJSONObject("browseEndpoint")
                             ?.optString("browseId")
                         if (!browseId.isNullOrEmpty()) {
-                            if (artistId == null && browseId.startsWith("UC")) {
-                                artistId = browseId
+                            if (browseId.startsWith("UC")) {
+                                if (artistId == null) {
+                                    artistId = browseId
+                                }
+                                extractedArtists.add(ExtractedEntity(id = browseId, name = runText))
                             } else if (albumId == null && browseId.startsWith("MPREb")) {
                                 albumId = browseId
+                                albumName = runText
                             }
                         }
 
@@ -440,9 +447,11 @@ object Parsers {
                     title = title,
                     artist = artist,
                     artistId = artistId,
+                    album = albumName,
                     albumId = albumId,
                     duration = duration,
-                    artworkUrl = artworkUrl
+                    artworkUrl = artworkUrl,
+                    artists = extractedArtists.toTypedArray()
                 )
                 tracks.add(track)
 
@@ -499,6 +508,8 @@ object Parsers {
                                     var artistBuilder = StringBuilder()
                                     var artistId: String? = null
                                     var albumId: String? = null
+                                    var albumName: String? = null
+                                    val extractedArtists = mutableListOf<ExtractedEntity>()
                                     
                                     if (longBylineTextRuns != null) {
                                         for (k in 0 until longBylineTextRuns.length()) {
@@ -513,8 +524,12 @@ object Parsers {
                                                 if (browseId.startsWith("UC")) {
                                                     if (artistId == null) artistId = browseId
                                                     artistBuilder.append(runText)
+                                                    extractedArtists.add(ExtractedEntity(id = browseId, name = runText))
                                                 } else if (browseId.startsWith("MPREb")) {
-                                                    if (albumId == null) albumId = browseId
+                                                    if (albumId == null) {
+                                                        albumId = browseId
+                                                        albumName = runText
+                                                    }
                                                     break // Stop accumulating artist name when we hit the album
                                                 } else {
                                                     break
@@ -551,9 +566,11 @@ object Parsers {
                                         title = title,
                                         artist = artist,
                                         artistId = artistId,
+                                        album = albumName,
                                         albumId = albumId,
                                         duration = duration,
-                                        artworkUrl = artworkUrl
+                                        artworkUrl = artworkUrl,
+                    artists = extractedArtists.toTypedArray()
                                     ))
                                 } catch (e: Exception) {
                                     Logger.w("Parsers: Failed to parse radio track", e)
@@ -714,7 +731,8 @@ object Parsers {
                                 val params = endpoint?.optString("params") ?: ""
                                 val combinedId = if (params.isNotEmpty()) "$browseId|||$params" else browseId
                                 if (combinedId.isNotEmpty()) {
-                                    itemsList.add(BrowseItem(id = combinedId, type = "genre", title = buttonText, subtitle = "Explore", artworkUrl = "", artistId = null, albumId = null))
+                                    itemsList.add(BrowseItem(id = combinedId, type = "genre", title = buttonText, subtitle = "Explore", artworkUrl = "", artistId = null, album = null, albumId = null, artists = emptyArray()
+                ))
                                 }
                                 continue
                             }
@@ -750,7 +768,8 @@ object Parsers {
                                 }
                                 
                                 if (id.isNotEmpty()) {
-                                    itemsList.add(BrowseItem(id = id, type = "podcast", title = titleObj, subtitle = sub, artworkUrl = artworkUrl, artistId = null, albumId = null))
+                                    itemsList.add(BrowseItem(id = id, type = "podcast", title = titleObj, subtitle = sub, artworkUrl = artworkUrl, artistId = null, album = null, albumId = null, artists = emptyArray()
+                ))
                                 }
                                 continue
                             }
@@ -770,6 +789,8 @@ object Parsers {
                             var artworkUrl = ""
                             var extractedArtistId: String? = null
                             var extractedAlbumId: String? = null
+                        var extractedAlbumName: String? = null
+                        val extractedArtists = mutableListOf<ExtractedEntity>()
 
                             if (isResponsive) {
                                 val flexColumns = item.optJSONArray("flexColumns") ?: continue
@@ -790,13 +811,16 @@ object Parsers {
                                 if (subtitleRuns != null) {
                                     for (k in 0 until subtitleRuns.length()) {
                                         val runObj = subtitleRuns.optJSONObject(k)
-                                        subtitleBuilder.append(runObj?.optString("text") ?: "")
+                                        val runText = runObj?.optString("text") ?: ""
+                                        subtitleBuilder.append(runText)
                                         val browseId = runObj?.optJSONObject("navigationEndpoint")?.optJSONObject("browseEndpoint")?.optString("browseId")
                                         if (!browseId.isNullOrEmpty()) {
-                                            if (extractedArtistId == null && browseId.startsWith("UC")) {
-                                                extractedArtistId = browseId
+                                            if (browseId.startsWith("UC")) {
+                                                if (extractedArtistId == null) extractedArtistId = browseId
+                                                extractedArtists.add(ExtractedEntity(id = browseId, name = runText))
                                             } else if (extractedAlbumId == null && browseId.startsWith("MPREb")) {
                                                 extractedAlbumId = browseId
+                                                extractedAlbumName = runText
                                             }
                                         }
                                     }
@@ -895,13 +919,16 @@ object Parsers {
                                 if (subtitleRuns != null) {
                                     for (k in 0 until subtitleRuns.length()) {
                                         val runObj = subtitleRuns.optJSONObject(k)
-                                        subtitleBuilder.append(runObj?.optString("text") ?: "")
+                                        val runText = runObj?.optString("text") ?: ""
+                                        subtitleBuilder.append(runText)
                                         val browseId = runObj?.optJSONObject("navigationEndpoint")?.optJSONObject("browseEndpoint")?.optString("browseId")
                                         if (!browseId.isNullOrEmpty()) {
-                                            if (extractedArtistId == null && browseId.startsWith("UC")) {
-                                                extractedArtistId = browseId
+                                            if (browseId.startsWith("UC")) {
+                                                if (extractedArtistId == null) extractedArtistId = browseId
+                                                extractedArtists.add(ExtractedEntity(id = browseId, name = runText))
                                             } else if (extractedAlbumId == null && browseId.startsWith("MPREb")) {
                                                 extractedAlbumId = browseId
+                                                extractedAlbumName = runText
                                             }
                                         }
                                     }
@@ -918,7 +945,7 @@ object Parsers {
                             }
 
                             if (id.isNotEmpty()) {
-                                itemsList.add(BrowseItem(id = id, type = type, title = itemTitle, subtitle = subtitle, artworkUrl = artworkUrl, artistId = extractedArtistId, albumId = extractedAlbumId))
+                                itemsList.add(BrowseItem(id = id, type = type, title = itemTitle, subtitle = subtitle, artworkUrl = artworkUrl, artistId = extractedArtistId, album = extractedAlbumName, albumId = extractedAlbumId, artists = extractedArtists.toTypedArray()))
                             }
                         } catch (e: Exception) {
                             Logger.w("Parsers: Failed to parse an item in Home Feed shelf, skipping it.", e)
@@ -945,6 +972,7 @@ object Parsers {
         var artistId: String? = null
         var year = ""
         var artworkUrl = ""
+        val extractedArtists = mutableListOf<ExtractedEntity>()
 
         try {
             val root = JSONObject(jsonString)
@@ -975,9 +1003,11 @@ object Parsers {
                             ?.optJSONObject("browseEndpoint")
                             ?.optString("browseId")
                         if (!browseId.isNullOrEmpty() && browseId.startsWith("UC")) {
-                            artistId = browseId
-                            albumArtist = run.optString("text") ?: albumArtist
-                            break
+                            if (artistId == null) {
+                                artistId = browseId
+                                albumArtist = run.optString("text") ?: albumArtist
+                            }
+                            extractedArtists.add(ExtractedEntity(id = browseId, name = run.optString("text") ?: ""))
                         }
                     }
 
@@ -1035,12 +1065,13 @@ object Parsers {
             }
 
             return AlbumDetails(
-                title = albumTitle, 
-                artist = albumArtist, 
+                title = albumTitle,
+                artist = albumArtist,
                 artistId = artistId,
-                year = year, 
-                artworkUrl = artworkUrl, 
-                tracks = tracks.toTypedArray()
+                year = year,
+                artworkUrl = artworkUrl,
+                tracks = tracks.toTypedArray(),
+                artists = extractedArtists.toTypedArray()
             )
         } catch (e: Exception) {
             Logger.e("Parsers: Failed to parse Album Details", e)
@@ -1353,6 +1384,33 @@ object Parsers {
                 if (thumbnails != null && thumbnails.length() > 0) {
                     artworkUrl = getHighResArtworkUrl(thumbnails.optJSONObject(thumbnails.length() - 1)?.optString("url")) ?: ""
                 }
+
+                // 3. Extract Subscriber Count ONLY
+                val subscribeButton = header.optJSONObject("subscriptionButton")?.optJSONObject("subscribeButtonRenderer")
+                
+                var subText: String? = subscribeButton
+                    ?.optJSONObject("subscriberCountWithSubscribeText")
+                    ?.optJSONArray("runs")
+                    ?.optJSONObject(0)
+                    ?.optString("text")
+
+                if (subText.isNullOrEmpty()) {
+                    subText = subscribeButton
+                        ?.optJSONObject("subscriberCountText")
+                        ?.optJSONArray("runs")
+                        ?.optJSONObject(0)
+                        ?.optString("text")
+                }
+
+                if (subText.isNullOrEmpty()) {
+                    subText = subscribeButton
+                        ?.optJSONObject("subscriberCountText")
+                        ?.optString("simpleText")
+                }
+
+                if (!subText.isNullOrEmpty()) {
+                    subtitle = subText.toString().replace(" subscribers", "").replace(" subscriber", "").trim()
+                }
             }
 
             val contents = root.optJSONObject("contents")
@@ -1445,9 +1503,11 @@ object Parsers {
                         title = title,
                         artist = artist,
                         artistId = artistId,
+                        album = null,
                         albumId = null,
                         duration = durationSeconds,
-                        artworkUrl = artworkUrl
+                        artworkUrl = artworkUrl,
+                        artists = emptyArray()
                     )
                 )
             } catch (e: Exception) {

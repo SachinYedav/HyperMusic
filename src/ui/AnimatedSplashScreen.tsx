@@ -1,16 +1,6 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-  Easing,
-  runOnJS,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, View, Animated, Easing } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
-import * as SplashScreen from 'expo-splash-screen';
 
 interface AnimatedSplashScreenProps {
   isReady: boolean;
@@ -26,61 +16,85 @@ export const AnimatedSplashScreen: React.FC<AnimatedSplashScreenProps> = ({
   isReady,
   onAnimationFinish,
 }) => {
-  const rotation = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const containerOpacity = useSharedValue(1);
-  const containerScale = useSharedValue(1);
+  const rotation = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const containerOpacity = useRef(new Animated.Value(1)).current;
+  const containerScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 1500, easing: Easing.linear }),
-      -1,
-      false
-    );
+    Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
 
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(1.06, { duration: 600, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.94, { duration: 600, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 1.06,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 0.94,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
 
-    // Frame-synced hand-off: Drop native splash exactly when the Reanimated frame is fully painted on the screen
-    requestAnimationFrame(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    });
   }, []);
 
   useEffect(() => {
     if (isReady) {
       // Execute exit transition
-      containerScale.value = withTiming(1.3, { duration: 400, easing: Easing.out(Easing.ease) });
-      containerOpacity.value = withTiming(0, { duration: 400, easing: Easing.out(Easing.ease) }, () => {
-        runOnJS(onAnimationFinish)();
+      Animated.parallel([
+        Animated.timing(containerScale, {
+          toValue: 1.3,
+          duration: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(containerOpacity, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        onAnimationFinish();
       });
     }
   }, [isReady]);
 
-  const outerSpinStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-    position: 'absolute',
+  const spin = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const outerSpinStyle = {
+    transform: [{ rotate: spin }],
+    position: 'absolute' as const,
     width: ICON_SIZE,
     height: ICON_SIZE,
-  }));
+  };
 
-  const innerPulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    position: 'absolute',
+  const innerPulseStyle = {
+    transform: [{ scale: scale }],
+    position: 'absolute' as const,
     width: ICON_SIZE,
     height: ICON_SIZE,
-  }));
+  };
 
-  const containerStyle = useAnimatedStyle(() => ({
-    opacity: containerOpacity.value,
-    transform: [{ scale: containerScale.value }],
-  }));
+  const containerStyle = {
+    opacity: containerOpacity,
+    transform: [{ scale: containerScale }],
+  };
 
   return (
     <Animated.View style={[styles.container, containerStyle]}>

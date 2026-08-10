@@ -16,16 +16,25 @@ dist/
 web-build/
 .cxx/
 .kotlin/
+# Allow EAS to use our custom native code, but ignore build caches
 android/.gradle/
 android/build/
 android/app/build/
 ios/build/
 ios/Pods/
+# Ignore internal native modules build folders just in case
 modules/react-native-hyper-extractor/android/build/
 modules/react-native-hyper-extractor/android/.gradle/
 modules/react-native-hyper-extractor/.cxx/
 modules/react-native-hyper-extractor/ios/build/
 modules/react-native-hyper-extractor/ios/Pods/
+
+modules/react-native-hyper-player/android/build/
+modules/react-native-hyper-player/android/.gradle/
+modules/react-native-hyper-player/.cxx/
+modules/react-native-hyper-player/ios/build/
+modules/react-native-hyper-player/ios/Pods/
+modules/react-native-hyper-player/node_modules/
 
 # Local SQLite Databases & Assets
 *.db
@@ -43,3 +52,7 @@ yarn-error.*
 *.pem
 .env*.local
 *.tsbuildinfo
+*.jar
+!android/gradle/wrapper/gradle-wrapper.jar
+*.apk
+TestNano.*

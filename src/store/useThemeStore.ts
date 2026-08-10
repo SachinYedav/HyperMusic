@@ -18,10 +18,13 @@ const zustandStorage = {
 };
 
 type ThemeMode = 'light' | 'dark' | 'system';
+export type BackgroundThemeKey = 'purple' | 'midnight' | 'crimson' | 'emerald' | 'sunset' | 'auto';
 
 interface ThemeState {
   mode: ThemeMode;
+  homeBackgroundTheme: BackgroundThemeKey;
   setMode: (mode: ThemeMode) => void;
+  setHomeBackgroundTheme: (theme: BackgroundThemeKey) => void;
 }
 
 /**
@@ -31,7 +34,9 @@ export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
       mode: 'dark',
+      homeBackgroundTheme: 'auto',
       setMode: (mode) => set({ mode }),
+      setHomeBackgroundTheme: (homeBackgroundTheme) => set({ homeBackgroundTheme }),
     }),
     {
       name: 'theme-storage',

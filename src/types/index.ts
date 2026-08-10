@@ -1,6 +1,4 @@
-import { Track as RNTrack } from 'react-native-track-player';
-
-export interface Track extends RNTrack {
+export interface Track {
   id: string;
   url: string;
   title: string;
@@ -9,4 +7,5 @@ export interface Track extends RNTrack {
   duration?: number;
   isExtracted?: boolean;
   extractedAt?: number; 
+  trackType?: string;
 }

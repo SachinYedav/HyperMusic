@@ -14,6 +14,18 @@ If you redistribute a built HyperMusic binary that includes NewPipe Extractor, y
 
 The NewPipe Extractor license text is included in `src/assets/data/licenses.json` and displayed in the app's open-source licenses screen.
 
+## Apache-2.0 Components
+
+The custom media engine (`react-native-hyper-player`) depends on:
+
+- Package: `androidx.media3:media3-exoplayer:1.3.1`
+- Package: `androidx.media3:media3-session:1.3.1`
+- Package: `androidx.media3:media3-common:1.3.1`
+- Package: `androidx.media3:media3-ui:1.3.1`
+- Repository: https://github.com/androidx/media
+- License: Apache-2.0
+
 ## Other Components
 
 Other third-party dependency notices are generated into `src/assets/data/licenses.json` and shown in the app's licenses screen. Run `npm run generate-licenses` after dependency changes.
+

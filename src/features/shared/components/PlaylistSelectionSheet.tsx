@@ -1,15 +1,14 @@
-import React, { useCallback, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Keyboard, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Keyboard, ActivityIndicator } from 'react-native';
 import { useSafeDatabase } from '@/database/useSafeDatabase';
 import { useTheme, spacing, radius, typography } from '@/theme';
 import { usePlaylistSelectionStore } from '@/store/usePlaylistSelectionStore';
 import { usePlaylists, Playlist } from '@/features/library/hooks/useLibrary';
-import { createPlaylist, addTrackToPlaylist } from '@/features/library/services/libraryService';
+import { createPlaylist, addTrackToPlaylist } from '@/database/queries';
 import { Plus, CheckCircle2 } from 'lucide-react-native';
 import { AppBottomSheet } from '@/ui/AppBottomSheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { useToastStore } from '@/store/useToastStore';
 
 /**
  * Singleton bottom sheet controller governing user playlist creation, live database entry commits, and track-to-playlist associations.
@@ -42,6 +41,7 @@ export function PlaylistSelectionSheet() {
       await addTrackToPlaylist(db, newId, trackToAdd);
       setIsProcessing(null);
       closeSheet();
+      useToastStore.getState().showToast(`Added to ${newPlaylistName.trim()}`, 'success');
     }, 150);
   };
 
@@ -54,6 +54,7 @@ export function PlaylistSelectionSheet() {
       await addTrackToPlaylist(db, playlist.id, trackToAdd);
       setIsProcessing(null);
       closeSheet();
+      useToastStore.getState().showToast(`Added to ${playlist.name}`, 'success');
     }, 150);
   };
 
@@ -106,49 +107,53 @@ export function PlaylistSelectionSheet() {
       visible={isOpen}
       onClose={closeSheet}
       headerComponent={renderHeader()}
-      scrollable={true}
-      maxDynamicContentSize={SCREEN_HEIGHT * 0.75}
       keyboardAvoiding={true}
       detached={false}
-    >
-      <View style={[styles.listContent, { paddingBottom: insets.bottom + spacing.xxl, minHeight: SCREEN_HEIGHT * 0.4 }]}>
-        {playlists.length === 0 ? (
+      minHeight={300}
+      flatListProps={{
+        data: playlists,
+        keyExtractor: (item: any) => item.id,
+        contentContainerStyle: [
+          styles.listContent,
+          { paddingBottom: insets.bottom + spacing.xxl },
+          playlists.length === 0 && { paddingVertical: spacing.md }
+        ],
+        showsVerticalScrollIndicator: false,
+        ListEmptyComponent: (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Playlists Found</Text>
             <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
               Create your first playlist above to start curating your collection.
             </Text>
           </View>
-        ) : (
-          playlists.map((item) => {
-            const isTargetProcessing = isProcessing === item.id;
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.playlistItem, { borderBottomColor: colors.border }]}
-                onPress={() => handleSelectPlaylist(item)}
-                activeOpacity={0.7}
-                disabled={!!isProcessing}
-              >
-                <View style={styles.playlistInfo}>
-                  <Text style={[styles.playlistName, { color: colors.text }]} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.trackCount, { color: colors.textMuted }]} numberOfLines={1}>
-                    Saved Playlist
-                  </Text>
-                </View>
-                {isTargetProcessing ? (
-                  <ActivityIndicator size="small" color={colors.text} />
-                ) : (
-                  <CheckCircle2 color={colors.border} size={20} style={{ opacity: 0.4 }} />
-                )}
-              </TouchableOpacity>
-            );
-          })
-        )}
-      </View>
-    </AppBottomSheet>
+        ),
+        renderItem: ({ item }: { item: any }) => {
+          const isTargetProcessing = isProcessing === item.id;
+          return (
+            <TouchableOpacity
+              style={[styles.playlistItem, { borderBottomColor: colors.border }]}
+              onPress={() => handleSelectPlaylist(item)}
+              activeOpacity={0.7}
+              disabled={!!isProcessing}
+            >
+              <View style={styles.playlistInfo}>
+                <Text style={[styles.playlistName, { color: colors.text }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={[styles.trackCount, { color: colors.textMuted }]} numberOfLines={1}>
+                  Saved Playlist
+                </Text>
+              </View>
+              {isTargetProcessing ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <CheckCircle2 color={colors.border} size={20} style={{ opacity: 0.4 }} />
+              )}
+            </TouchableOpacity>
+          );
+        }
+      }}
+    />
   );
 }
 
@@ -187,12 +192,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   emptyContainer: {
-    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xxl,
+    paddingVertical: spacing.xl,
     paddingHorizontal: spacing.xxl,
-    minHeight: 200,
   },
   emptyTitle: {
     fontSize: typography.bodyLg,

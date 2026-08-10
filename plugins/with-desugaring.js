@@ -8,7 +8,7 @@ module.exports = function withDesugaring(config) {
       if (!buildGradle.includes('coreLibraryDesugaringEnabled')) {
         buildGradle = buildGradle.replace(
           /android\s*\{/,
-          'android {\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n    }'
+          'android {\n    compileOptions {\n        coreLibraryDesugaringEnabled = true\n    }'
         );
       }
       

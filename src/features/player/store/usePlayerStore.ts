@@ -1,230 +1,240 @@
 import { create } from 'zustand';
 import { Track } from '@/types';
-import TrackPlayer from 'react-native-track-player';
+import { HyperPlayer } from 'react-native-hyper-player';
+import { useDownloadStore } from '../../library/store/useDownloadStore';
+import { useToastStore } from '@/store/useToastStore';
+import { useSettingsStore } from '@/features/settings/store/useSettingsStore';
 
-const shuffleArray = <T,>(array: T[]): T[] => {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-};
-
+/**
+ * Global Zustand Store for the Audio Player.
+ * Acts as the UI's Single Source of Truth (SSOT).
+ * State is strictly synchronized with the Native Engine via PlayerEngineManager.
+ */
 interface PlayerState {
   activeTrack: Track | null;
   playbackState: 'playing' | 'paused' | 'loading' | 'stopped' | 'error' | 'resolving' | 'buffering';
   isPlaying: boolean;
   isBuffering: boolean;
+  isResolving: boolean;
   isMiniPlayerVisible: boolean;
+  isExpanded: boolean;
+  setExpanded: (expanded: boolean) => void;
   queue: Track[];
+  queueRevision: number;
+  implicitStartIndex: number; // -1 means no auto-play section exists
+  autoPlayPool: Track[]; // Background cache of radio tracks
 
   repeatMode: 'off' | 'all' | 'one';
   isShuffle: boolean;
-  shuffledIndices: number[];
 
   expandPlayerSignal: number;
-  urlCache: Record<string, { url: string; extractedAt: number }>;
+  collapsePlayerSignal: number;
   colorCache: Record<string, string>;
+
+  isVideoMode: boolean;
+  setIsVideoMode: (isVideo: boolean) => void;
 
   setColorCache: (trackId: string, color: string) => void;
 
+  /**
+   * Passive setters for Native Engine events.
+   * These should NOT be called directly by UI components.
+   * They are exclusively triggered by PlayerEngineManager syncing from Native.
+   */
   setActiveTrack: (track: Track | null) => void;
   setQueue: (tracks: Track[]) => void;
   updateTrack: (trackId: string, updates: Partial<Track>) => void;
   setPlaybackState: (state: 'playing' | 'paused' | 'loading' | 'stopped' | 'error' | 'resolving' | 'buffering') => void;
-  setPlaybackFlags: (isPlaying: boolean, isBuffering: boolean) => void;
+  setPlaybackFlags: (isPlaying: boolean, isBuffering: boolean, isResolving: boolean, queueRevision: number) => void;
 
-  getNextTrack: () => Track | null;
-  getPreviousTrack: () => Track | null;
-
+  /**
+   * Active UI Commands.
+   * These methods dispatch requests directly to the Native Engine (HyperPlayer).
+   */
   playTrack: (track: Track) => void;
   playList: (tracks: Track[], startIndex?: number, startShuffled?: boolean) => void;
   insertNext: (track: Track) => void;
+  insertListNext: (tracks: Track[]) => void;
   appendToQueue: (track: Track) => void;
   appendTracks: (tracks: Track[]) => void;
+
+  // Auto-Play specific
+  isAutoPlayLoading: boolean;
+  autoPlayError: boolean;
+  setAutoPlayPool: (tracks: Track[]) => void;
+  loadMoreAutoPlayTracks: () => Promise<void>;
+  injectAutoPlayBatch: () => void;
+  toggleAutoPlayVisibility: (isVisible: boolean) => void;
 
   pause: () => void;
   resume: () => void;
   skipToNext: () => void;
   skipToPrevious: () => void;
+  seekTo: (positionMs: number) => void;
+
+  reorderQueue: (fromIndex: number, toIndex: number, skipStateUpdate?: boolean) => void;
 
   toggleShuffle: () => void;
   toggleRepeat: () => void;
+  cyclePlaybackMode: () => void;
+  collapsePlayer: () => void;
 }
+
+/**
+ * Helper to map JS Track objects to Native-compatible representations.
+ * Crucially handles offline playback by seamlessly substituting the remote URL
+ * with a local file URI if the track exists in the download store.
+ */
+const mapToPlayerTrack = (t: any) => {
+  let downloadedUrl = useDownloadStore.getState().completedDownloads[t.id];
+
+  if (downloadedUrl) {
+    if (downloadedUrl.startsWith('/')) {
+      downloadedUrl = `file://${downloadedUrl}`;
+    } else if (downloadedUrl.startsWith('file:/') && !downloadedUrl.startsWith('file:///')) {
+      downloadedUrl = downloadedUrl.replace('file:/', 'file:///');
+    }
+  }
+
+  return {
+    id: t.id,
+    queueEntryId: t._queueId || t.id, // SSOT unique identity
+    url: downloadedUrl || t.url || `hyper://${t.id}`,
+    title: t.title,
+    artist: t.artist || 'Unknown Artist',
+    artworkUrl: typeof t.artwork === 'string' ? t.artwork : '',
+    duration: t.duration || 0,
+    trackType: t.trackType || 'song' // Default to song
+  };
+};
+
+/**
+ * Ensures every track has a unique instance ID (_queueId).
+ * This prevents React/Native reconciliation bugs when the same song
+ * appears multiple times in a queue.
+ */
+const ensureQueueId = (t: any) => ({
+  ...t,
+  _queueId: t._queueId || `${t.id}-${Math.random().toString(36).substring(2, 9)}`
+});
+
+let modeSwitchLockTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   activeTrack: null,
   playbackState: 'stopped',
   isPlaying: false,
   isBuffering: false,
+  isResolving: false,
   isMiniPlayerVisible: false,
+  isExpanded: false,
+  setExpanded: (expanded) => set({ isExpanded: expanded }),
   queue: [],
+  queueRevision: 0, // SSOT revision tracking
+  implicitStartIndex: -1,
+  autoPlayPool: [],
+  isAutoPlayLoading: false,
+  autoPlayError: false,
 
   repeatMode: 'off',
   isShuffle: false,
-  shuffledIndices: [],
 
   expandPlayerSignal: 0,
-  urlCache: {},
+  collapsePlayerSignal: 0,
   colorCache: {},
+
+  isVideoMode: false,
+  setIsVideoMode: (isVideo) => {
+    const state = get();
+    
+    set({ isVideoMode: isVideo });
+
+    // Manage UI mode switch lock to synchronize with native video state transitions
+    if (modeSwitchLockTimeout) clearTimeout(modeSwitchLockTimeout);
+    modeSwitchLockTimeout = setTimeout(() => { modeSwitchLockTimeout = null; }, 1000);
+
+    if (isVideo) {
+      HyperPlayer.switchToVideo();
+    } else {
+      HyperPlayer.switchToAudio();
+    }
+  },
 
   setColorCache: (trackId, color) => set((state) => ({
     colorCache: { ...state.colorCache, [trackId]: color }
   })),
 
+  // --- PASSIVE MIRROR METHODS ---
   setActiveTrack: (track) => {
-    const state = get();
     if (!track) {
       set({ activeTrack: null, isMiniPlayerVisible: false, isPlaying: false, isBuffering: false });
-      return;
-    }
+    } else {
+      const shouldBeVideo = track.trackType === 'video' || track.trackType === 'podcast';
 
-    if (state.isShuffle) {
-      const idx = state.queue.findIndex(t => t.id === track.id);
-      if (idx !== -1) {
-        const remainingIndices = state.queue.map((_, i) => i).filter(i => i !== idx);
-        const newShuffled = [idx, ...shuffleArray(remainingIndices)];
-        set({ activeTrack: track, isMiniPlayerVisible: true, shuffledIndices: newShuffled });
-        return;
+      // Respect the UI mode switch lock if user recently toggled manually
+      if (modeSwitchLockTimeout) {
+        set({ activeTrack: track, isMiniPlayerVisible: true });
+      } else {
+        set({ activeTrack: track, isMiniPlayerVisible: true, isVideoMode: shouldBeVideo });
       }
     }
-    set({ activeTrack: track, isMiniPlayerVisible: true });
   },
 
-  setQueue: (tracks) => set({ queue: tracks }),
+  setQueue: (tracks) => set({ queue: tracks.map(ensureQueueId) }),
 
   updateTrack: (trackId, updates) => set((state) => {
     const newQueue = state.queue.map(t => t.id === trackId ? { ...t, ...updates } : t);
     const newActive = state.activeTrack?.id === trackId ? { ...state.activeTrack, ...updates } : state.activeTrack;
-
-    let newUrlCache = state.urlCache;
-    if (updates.url && updates.extractedAt) {
-      newUrlCache = {
-        ...state.urlCache,
-        [trackId]: { url: updates.url, extractedAt: updates.extractedAt }
-      };
-    }
-
-    return { queue: newQueue, activeTrack: newActive, urlCache: newUrlCache };
+    return { queue: newQueue, activeTrack: newActive };
   }),
 
   setPlaybackState: (state) => set({ playbackState: state }),
-  setPlaybackFlags: (isPlaying, isBuffering) => set({ isPlaying, isBuffering }),
+  setPlaybackFlags: (isPlaying, isBuffering, isResolving, queueRevision) => set((state) => ({
+    isPlaying,
+    isBuffering,
+    isResolving,
+    // Only accept Native queue revision if it's newer or equal, discarding stale Native events
+    queueRevision: Math.max(state.queueRevision, queueRevision)
+  })),
 
-  getNextTrack: () => {
-    const state = get();
-    if (!state.activeTrack || state.queue.length === 0) return null;
-
-    if (state.repeatMode === 'one') {
-      return state.activeTrack;
-    }
-
-    const currIdx = state.queue.findIndex(t => t.id === state.activeTrack?.id);
-    if (currIdx === -1) return null;
-
-    if (state.isShuffle) {
-      const pos = state.shuffledIndices.indexOf(currIdx);
-      if (pos === -1) return null;
-      if (pos + 1 < state.shuffledIndices.length) {
-        return state.queue[state.shuffledIndices[pos + 1]];
-      } else {
-        return state.repeatMode === 'all' ? state.queue[state.shuffledIndices[0]] : null;
-      }
-    } else {
-      if (currIdx + 1 < state.queue.length) {
-        return state.queue[currIdx + 1];
-      } else {
-        return state.repeatMode === 'all' ? state.queue[0] : null;
-      }
-    }
-  },
-
-  getPreviousTrack: () => {
-    const state = get();
-    if (!state.activeTrack || state.queue.length === 0) return null;
-
-    const currIdx = state.queue.findIndex(t => t.id === state.activeTrack?.id);
-    if (currIdx === -1) return null;
-
-    if (state.isShuffle) {
-      const pos = state.shuffledIndices.indexOf(currIdx);
-      if (pos === -1) return null;
-      if (pos - 1 >= 0) {
-        return state.queue[state.shuffledIndices[pos - 1]];
-      } else {
-        return state.repeatMode === 'all' ? state.queue[state.shuffledIndices[state.shuffledIndices.length - 1]] : null;
-      }
-    } else {
-      if (currIdx - 1 >= 0) {
-        return state.queue[currIdx - 1];
-      } else {
-        return state.repeatMode === 'all' ? state.queue[state.queue.length - 1] : null;
-      }
-    }
-  },
+  // --- UI COMMAND METHODS ---
 
   playTrack: (track) => {
-    const state = get();
-    const cached = state.urlCache[track.id];
-    const finalTrack = cached ? { ...track, url: cached.url, isExtracted: true, extractedAt: cached.extractedAt } : track;
-
+    const queuedTrack = ensureQueueId(track);
+    const nextRevision = get().queueRevision + 1;
     set({
-      activeTrack: finalTrack,
-      queue: [finalTrack],
+      queue: [queuedTrack],
+      queueRevision: nextRevision,
+      implicitStartIndex: -1,
+      autoPlayPool: [],
       isShuffle: false,
-      shuffledIndices: [],
-      isMiniPlayerVisible: true,
-      playbackState: 'playing',
-      isPlaying: true,
-      isBuffering: !cached,
       expandPlayerSignal: Date.now()
     });
+    const playerTrack = mapToPlayerTrack(track);
+    HyperPlayer.loadQueue([playerTrack], 0, get().repeatMode, false, nextRevision);
   },
 
   playList: (tracks, startIndex = 0, startShuffled = false) => {
     if (tracks.length === 0) return;
 
-    const state = get();
-    const hydratedTracks = tracks.map(t => {
-      const cached = state.urlCache[t.id];
-      if (cached) {
-        return { ...t, url: cached.url, isExtracted: true, extractedAt: cached.extractedAt };
-      }
-      return t;
-    });
-
-    const activeItem = hydratedTracks[startIndex];
-    const isCached = !!activeItem?.isExtracted;
-
     if (startShuffled) {
-      const remainingIndices = hydratedTracks.map((_, i) => i).filter(i => i !== startIndex);
-      const shuffledIndices = [startIndex, ...shuffleArray(remainingIndices)];
-
-      set({
-        isShuffle: true,
-        queue: hydratedTracks,
-        shuffledIndices,
-        activeTrack: activeItem,
-        isMiniPlayerVisible: true,
-        playbackState: 'playing',
-        isPlaying: true,
-        isBuffering: !isCached,
-        expandPlayerSignal: Date.now()
-      });
-    } else {
-      set({
-        isShuffle: false,
-        queue: hydratedTracks,
-        shuffledIndices: [],
-        activeTrack: activeItem,
-        isMiniPlayerVisible: true,
-        playbackState: 'playing',
-        isPlaying: true,
-        isBuffering: !isCached,
-        expandPlayerSignal: Date.now()
-      });
+      set({ isShuffle: true });
     }
+
+    const isShuffle = get().isShuffle;
+    const queuedTracks = tracks.map(ensureQueueId);
+    const nextRevision = get().queueRevision + 1;
+    set({
+      queue: queuedTracks,
+      queueRevision: nextRevision,
+      implicitStartIndex: -1,
+      autoPlayPool: [],
+      expandPlayerSignal: Date.now()
+    });
+    const playerTracks = tracks.map(mapToPlayerTrack);
+
+    // Synchronously dispatch to the Native Engine. The queueRevision guarantees UI/Native synchronization.
+    HyperPlayer.loadQueue(playerTracks, startIndex, get().repeatMode, isShuffle, nextRevision);
   },
 
   insertNext: (track) => {
@@ -234,31 +244,36 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
 
-    if (state.queue.some(t => t.id === track.id)) {
-      return; // Deduplicate: prevent queue spamming
-    }
+    const currIdx = state.queue.findIndex(t => t.id === state.activeTrack?.id);
+    const insertIdx = currIdx !== -1 ? currIdx + 1 : state.queue.length;
 
-    const cached = state.urlCache[track.id];
-    const finalTrack = cached ? { ...track, url: cached.url, isExtracted: true, extractedAt: cached.extractedAt } : track;
+    const queuedTrack = ensureQueueId(track);
+    const newQueue = [...state.queue];
+    newQueue.splice(insertIdx, 0, queuedTrack);
+    const nextRevision = state.queueRevision + 1;
+    set({ queue: newQueue, queueRevision: nextRevision });
+
+    HyperPlayer.addTracks([mapToPlayerTrack(track)], insertIdx, nextRevision);
+  },
+
+  insertListNext: (tracks) => {
+    if (tracks.length === 0) return;
+    const state = get();
+    if (state.queue.length === 0) {
+      get().playList(tracks);
+      return;
+    }
 
     const currIdx = state.queue.findIndex(t => t.id === state.activeTrack?.id);
     const insertIdx = currIdx !== -1 ? currIdx + 1 : state.queue.length;
 
+    const queuedTracks = tracks.map(ensureQueueId);
     const newQueue = [...state.queue];
-    newQueue.splice(insertIdx, 0, finalTrack);
+    newQueue.splice(insertIdx, 0, ...queuedTracks);
+    const nextRevision = state.queueRevision + 1;
+    set({ queue: newQueue, queueRevision: nextRevision });
 
-    let newShuffled = [...state.shuffledIndices];
-    if (state.isShuffle) {
-      newShuffled = newShuffled.map(idx => idx >= insertIdx ? idx + 1 : idx);
-      const currentShufflePos = newShuffled.indexOf(currIdx);
-      if (currentShufflePos !== -1) {
-        newShuffled.splice(currentShufflePos + 1, 0, insertIdx);
-      } else {
-        newShuffled.push(insertIdx);
-      }
-    }
-
-    set({ queue: newQueue, shuffledIndices: newShuffled });
+    HyperPlayer.addTracks(tracks.map(mapToPlayerTrack), insertIdx, nextRevision);
   },
 
   appendToQueue: (track) => {
@@ -268,106 +283,211 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
 
-    if (state.queue.some(t => t.id === track.id)) {
-      return; // Deduplicate: prevent queue spamming
-    }
+    const queuedTrack = ensureQueueId(track);
+    const newQueue = [...state.queue, queuedTrack];
+    const nextRevision = state.queueRevision + 1;
+    set({ queue: newQueue, queueRevision: nextRevision });
 
-    const cached = state.urlCache[track.id];
-    const finalTrack = cached ? { ...track, url: cached.url, isExtracted: true, extractedAt: cached.extractedAt } : track;
-
-    const newQueue = [...state.queue, finalTrack];
-
-    let newShuffled = [...state.shuffledIndices];
-    if (state.isShuffle) {
-      newShuffled.push(newQueue.length - 1);
-    }
-
-    set({ queue: newQueue, shuffledIndices: newShuffled });
+    HyperPlayer.addTracks([mapToPlayerTrack(track)], state.queue.length, nextRevision);
   },
 
   appendTracks: (tracks) => {
     if (tracks.length === 0) return;
     const state = get();
+    const queuedTracks = tracks.map(ensureQueueId);
+    const newQueue = [...state.queue, ...queuedTracks];
+    const nextRevision = state.queueRevision + 1;
+    set({ queue: newQueue, queueRevision: nextRevision });
 
-    // Hydrate tracks with cached URLs if any
-    const hydratedTracks = tracks.map(t => {
-      const cached = state.urlCache[t.id];
-      if (cached) {
-        return { ...t, url: cached.url, isExtracted: true, extractedAt: cached.extractedAt };
-      }
-      return t;
-    });
-
-    const newQueue = [...state.queue, ...hydratedTracks];
-
-    let newShuffled = [...state.shuffledIndices];
-    if (state.isShuffle) {
-        // Just append the new indices to the end of the shuffled array 
-        const startIndex = state.queue.length;
-        for (let i = 0; i < tracks.length; i++) {
-            newShuffled.push(startIndex + i);
-        }
-    }
-
-    set({ queue: newQueue, shuffledIndices: newShuffled });
+    HyperPlayer.addTracks(tracks.map(mapToPlayerTrack), state.queue.length, nextRevision);
   },
 
-  pause: () => set({ playbackState: 'paused', isPlaying: false }),
-  resume: () => set({ playbackState: 'playing', isPlaying: true }),
+  pause: () => HyperPlayer.pause(),
+  resume: () => HyperPlayer.play(),
+  skipToNext: () => HyperPlayer.skipToNext(),
+  skipToPrevious: () => HyperPlayer.skipToPrevious(),
 
-  skipToNext: async () => {
+  seekTo: (positionMs) => HyperPlayer.seekTo(positionMs),
+
+  reorderQueue: (fromIndex, toIndex, skipStateUpdate) => {
     const state = get();
-    if (state.repeatMode === 'one') {
-      TrackPlayer.seekTo(0);
-      TrackPlayer.play();
-      set({ playbackState: 'playing', isPlaying: true, isBuffering: false });
-      return;
-    }
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= state.queue.length || toIndex >= state.queue.length) return;
 
-    const next = state.getNextTrack();
-    if (next) {
-      set({ activeTrack: next, playbackState: 'loading', isPlaying: true, isBuffering: !next.isExtracted });
+    const nextRevision = state.queueRevision + 1;
+
+    if (!skipStateUpdate) {
+      // Optimistic UI update
+      const newQueue = [...state.queue];
+      const [movedTrack] = newQueue.splice(fromIndex, 1);
+      newQueue.splice(toIndex, 0, movedTrack);
+      set({ queue: newQueue, queueRevision: nextRevision });
     } else {
-      set({ playbackState: 'stopped', isPlaying: false, isBuffering: false });
-    }
-  },
-
-  skipToPrevious: () => {
-    const state = get();
-    if (state.repeatMode === 'one') {
-      TrackPlayer.seekTo(0);
-      TrackPlayer.play();
-      set({ playbackState: 'playing', isPlaying: true, isBuffering: false });
-      return;
+      set({ queueRevision: nextRevision });
     }
 
-    const prev = state.getPreviousTrack();
-    if (prev) {
-      set({ activeTrack: prev, playbackState: 'loading', isPlaying: true, isBuffering: !prev.isExtracted });
-    }
+    // Push shift to native engine without interrupting play
+    HyperPlayer.moveTrack(fromIndex, toIndex, nextRevision);
   },
 
   toggleShuffle: () => {
     const state = get();
-    if (!state.activeTrack || state.queue.length <= 1) return;
-
-    if (state.isShuffle) {
-      set({ isShuffle: false, shuffledIndices: [] });
-    } else {
-      const currIdx = state.queue.findIndex(t => t.id === state.activeTrack?.id);
-      const remainingIndices = state.queue.map((_, i) => i).filter(i => i !== currIdx);
-      const shuffledIndices = [currIdx, ...shuffleArray(remainingIndices)];
-
-      set({
-        isShuffle: true,
-        shuffledIndices
-      });
-    }
+    const newShuffle = !state.isShuffle;
+    set({ isShuffle: newShuffle });
+    HyperPlayer.setShuffle(newShuffle);
   },
 
   toggleRepeat: () => {
     const current = get().repeatMode;
     const nextMode = current === 'off' ? 'all' : current === 'all' ? 'one' : 'off';
     set({ repeatMode: nextMode });
-  }
+    HyperPlayer.setRepeatMode(nextMode);
+  },
+
+  cyclePlaybackMode: () => {
+    const state = get();
+    // Flow: Shuffle -> Repeat 1 -> Repeat All -> Off
+    if (!state.isShuffle && state.repeatMode === 'off') {
+      // Off -> Shuffle
+      set({ isShuffle: true, repeatMode: 'off' });
+      HyperPlayer.setShuffle(true);
+      HyperPlayer.setRepeatMode('off');
+    } else if (state.isShuffle) {
+      // Shuffle -> Repeat One
+      set({ isShuffle: false, repeatMode: 'one' });
+      HyperPlayer.setShuffle(false);
+      HyperPlayer.setRepeatMode('one');
+    } else if (state.repeatMode === 'one') {
+      // Repeat One -> Repeat All
+      set({ isShuffle: false, repeatMode: 'all' });
+      HyperPlayer.setShuffle(false);
+      HyperPlayer.setRepeatMode('all');
+      // Repeat All -> Off
+      set({ isShuffle: false, repeatMode: 'off' });
+      HyperPlayer.setShuffle(false);
+      HyperPlayer.setRepeatMode('off');
+    }
+  },
+
+
+  /**
+   * Auto-Play Methods.
+   * Manages infinite scroll and implicit queue tracks.
+   */
+  setAutoPlayPool: (tracks) => {
+    const state = get();
+    const isFirstAutoPlay = state.implicitStartIndex === -1;
+    const implicitStartIndex = isFirstAutoPlay ? state.queue.length : state.implicitStartIndex;
+
+    /**
+     * Batching Strategy:
+     * Loads the first 15 tracks to the UI immediately if it's the first time.
+     * The rest are pushed to a background pool to avoid freezing the UI thread.
+     */
+    const batchSize = 15;
+    const initialBatch = isFirstAutoPlay ? tracks.slice(0, batchSize) : [];
+    const remainingPool = isFirstAutoPlay ? tracks.slice(batchSize) : tracks;
+
+    set({
+      implicitStartIndex,
+      autoPlayPool: [...state.autoPlayPool, ...remainingPool]
+    });
+
+    const autoplay = useSettingsStore.getState().autoplay;
+    if (autoplay && isFirstAutoPlay) {
+      /**
+       * UI Optimization:
+       * Defers heavy React list reconciliation by 400ms.
+       * Allows the PlayerBottomSheet spring animation to settle, preventing UI lock.
+       */
+      setTimeout(() => {
+        get().appendTracks(initialBatch);
+      }, 400);
+    } else if (!autoplay && isFirstAutoPlay) {
+      // If autoplay is OFF, keep the initial batch in the pool instead of appending
+      set({ autoPlayPool: [...initialBatch, ...remainingPool] });
+    }
+
+    // If not first auto play, native player might be starving, we can inject immediately if queue is extremely short
+    if (autoplay && !isFirstAutoPlay) {
+      const remainingItems = state.queue.length - Math.max(0, state.queue.findIndex(t => t.id === state.activeTrack?.id)) - 1;
+      if (remainingItems <= 2) {
+        get().injectAutoPlayBatch();
+      }
+    }
+  },
+
+  injectAutoPlayBatch: () => {
+    const state = get();
+    if (state.autoPlayPool.length === 0 || !useSettingsStore.getState().autoplay) return;
+
+    // Grab up to 10 tracks silently
+    const batchSize = 10;
+    const batch = state.autoPlayPool.slice(0, batchSize);
+    const remaining = state.autoPlayPool.slice(batchSize);
+
+    // Update pool
+    set({ autoPlayPool: remaining });
+
+    // Append to UI and Native Queue seamlessly
+    // Defer the heavy React FlatList reconciliation to allow user gestures (like scroll/drag) to resolve
+    setTimeout(() => {
+      get().appendTracks(batch);
+    }, 150);
+  },
+
+  toggleAutoPlayVisibility: (isVisible: boolean) => {
+    const state = get();
+    if (state.implicitStartIndex === -1) return;
+
+    if (!isVisible) {
+      // Safely preserve the active track if it is within the auto-play section being removed
+      const activeIndex = state.queue.findIndex(t => t.id === state.activeTrack?.id);
+      let sliceIndex = state.implicitStartIndex;
+      if (activeIndex >= sliceIndex) {
+        sliceIndex = activeIndex + 1;
+      }
+
+      // Turn OFF: Slice queue back to explicit, push implicit tracks to the FRONT of the pool
+      const explicitTracks = state.queue.slice(0, sliceIndex);
+      const implicitTracks = state.queue.slice(sliceIndex);
+      const nextRevision = state.queueRevision + 1;
+      set({
+        queue: explicitTracks,
+        autoPlayPool: [...implicitTracks, ...state.autoPlayPool],
+        queueRevision: nextRevision
+      });
+      // Synchronize native queue with explicit tracks using SSOT revision
+      const safeStartIndex = Math.max(0, explicitTracks.findIndex(t => t.id === state.activeTrack?.id));
+
+      HyperPlayer.loadQueue(
+        explicitTracks.map(mapToPlayerTrack),
+        safeStartIndex,
+        get().repeatMode,
+        get().isShuffle,
+        nextRevision
+      );
+    } else {
+      // Turn ON: Pop tracks from pool and append
+      get().injectAutoPlayBatch();
+    }
+  },
+
+  loadMoreAutoPlayTracks: async () => {
+    const state = get();
+    if (state.autoPlayPool.length === 0 || state.isAutoPlayLoading) return;
+
+    set({ isAutoPlayLoading: true, autoPlayError: false });
+
+    try {
+      get().injectAutoPlayBatch();
+    } catch (error) {
+      console.error('[usePlayerStore] Failed to load more auto-play tracks', error);
+      set({ autoPlayError: true });
+      useToastStore.getState().showToast('Failed to load similar tracks. Tap retry.', 'error');
+    } finally {
+      set({ isAutoPlayLoading: false });
+    }
+  },
+
+  collapsePlayer: () => set((state) => ({ collapsePlayerSignal: state.collapsePlayerSignal + 1 })),
 }));

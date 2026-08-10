@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Image as RNImage } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, spacing, typography, radius } from '@/theme';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '@/navigation/types';
@@ -18,10 +18,11 @@ import { FeedCarousel } from '@/features/home/components/FeedCarousel';
 import { HeroBannerCard } from '@/features/home/components/HeroBannerCard';
 import { TrackResultCard } from '@/features/search/components/TrackResultCard';
 import { useExplorePage } from '../hooks/useExplorePage';
-import { BrowseItem, BrowseShelf } from 'react-native-hyper-extractor';
+import { BrowseItem } from 'react-native-hyper-extractor';
 import { usePlayerStore } from '@/store';
 import { Image } from 'expo-image';
 import { ErrorState } from '@/ui/ErrorState';
+import { WaveLoader } from '@/ui/WaveLoader';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
 
@@ -223,8 +224,8 @@ export function ExploreCategoryScreen({ navigation, route }: Props) {
         )}
 
         <View style={[styles.topBar, { marginTop: insets.top }]}>
-          <Pressable hitSlop={12} onPress={() => navigation.goBack()} style={[styles.iconBtn, { backgroundColor: colors.overlayLight }]}>
-            <ArrowLeft color={colors.white} size={24} />
+          <Pressable hitSlop={12} onPress={() => navigation.goBack()} style={styles.iconBtnDirect}>
+            <ArrowLeft color={colors.white} size={28} />
           </Pressable>
           <Animated.Text style={[styles.stickyTitle, { color: colors.white }, titleOpacityStyle]} numberOfLines={1}>
             {title}
@@ -238,8 +239,8 @@ export function ExploreCategoryScreen({ navigation, route }: Props) {
       </Animated.View>
 
       {isLoading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.brand} />
+        <View style={{ flex: 1, paddingTop: HEADER_MAX_HEIGHT }}>
+          <WaveLoader />
         </View>
       ) : isError ? (
         <ErrorState error={error} onRetry={refetch} containerStyle={{ paddingTop: HEADER_MAX_HEIGHT }} />
@@ -286,10 +287,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     zIndex: 1,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.xl,
+  iconBtnDirect: {
+    padding: spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -372,7 +371,7 @@ const styles = StyleSheet.create({
   genreTile: {
     width: '48%',
     height: 80,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     padding: spacing.md,
     justifyContent: 'flex-end',
   },

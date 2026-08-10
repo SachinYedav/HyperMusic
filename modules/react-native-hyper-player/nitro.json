@@ -1,0 +1,26 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": [
+    "hyperplayer"
+  ],
+  "ios": {
+    "iosModuleName": "HyperPlayer"
+  },
+  "android": {
+    "androidNamespace": [
+      "hyperplayer"
+    ],
+    "androidCxxLibName": "HyperPlayer"
+  },
+  "autolinking": {
+    "HyperPlayer": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridHyperPlayer"
+      }
+    }
+  },
+  "ignorePaths": [
+    "**/node_modules"
+  ]
+}

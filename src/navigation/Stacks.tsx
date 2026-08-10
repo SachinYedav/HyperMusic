@@ -11,6 +11,7 @@ import { LicensesScreen } from '@/features/settings/screens/LicensesScreen';
 import { LicenseDetailScreen } from '@/features/settings/screens/LicenseDetailScreen';
 import { PersonalizeTasteScreen } from '@/features/settings/screens/PersonalizeTasteScreen';
 import { AppUpdatesScreen } from '@/features/settings/screens/AppUpdatesScreen';
+import { StorageSettingsScreen } from '@/features/settings/screens/StorageSettingsScreen';
 
 import { PlaylistDetailsScreen } from '@/features/shared/screens/PlaylistDetailsScreen';
 import { PodcastDetailsScreen } from '@/features/shared/screens/PodcastDetailsScreen';
@@ -109,6 +110,7 @@ export function SettingsStackNavigator() {
       <SettingsStack.Screen name="LicenseDetail" component={LicenseDetailScreen} />
       <SettingsStack.Screen name="PersonalizeTaste" component={PersonalizeTasteScreen} />
       <SettingsStack.Screen name="AppUpdates" component={AppUpdatesScreen} />
+      <SettingsStack.Screen name="StorageSettings" component={StorageSettingsScreen} />
     </SettingsStack.Navigator>
   );
 }

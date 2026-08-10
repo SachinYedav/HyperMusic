@@ -1,22 +1,21 @@
-import TrackPlayer, { State } from 'react-native-track-player';
 import { usePlayerStore, useSettingsStore } from '@/store';
-import { extractorService } from '@/services/api/extractorService';
+import { useToastStore } from '@/store/useToastStore';
 import { Track } from '@/types';
 import { HyperExtractor } from 'react-native-hyper-extractor';
 import * as SQLite from 'expo-sqlite';
 import { recordPlay } from '@/features/library/services/historyService';
-import { downloadService } from '@/features/library/services/downloadService';
-
-const EXPIRATION_TIME_MS = 5.5 * 60 * 60 * 1000;
+import { DeviceEventEmitter } from 'react-native';
+import { PlaybackStateChangeEvent, HyperPlayer } from 'react-native-hyper-player';
 
 /**
- * Core standalone JS playback engine manager orchestrating Zustand synchronization, sliding window track queueing, cipher extraction prefetching, and cumulative playback history recording.
+ * Passive JS Event Listener for the native HyperPlayer engine.
+ * Receives high-frequency JSI events, synchronizes the Zustand UI store, 
+ * and handles background history tracking (SQLite) for music plays.
  */
 class PlayerEngineManagerClass {
   private isInitialized = false;
+  private bufferingTimeout: ReturnType<typeof setTimeout> | null = null;
   private currentLoadedTrackId: string | null = null;
-  private currentPlaybackState: string = 'stopped';
-  private abortController: AbortController | null = null;
   private fetchingRadioForId: string | null = null;
 
   // Playback History Tracking
@@ -29,59 +28,174 @@ class PlayerEngineManagerClass {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
-    // Subscribe to Zustand store changes directly
-    usePlayerStore.subscribe((state) => {
-      this.handleStoreChange(state);
+    // Bind native event emitters to JS handlers
+    DeviceEventEmitter.addListener('onTrackTransition', (event: any) => {
+      const payloadStr = event.reason || "";
+      const parts = payloadStr.split(":");
+      const reason = parts[0] || "auto";
+      const remainingItems = parts.length > 1 ? parseInt(parts[1], 10) : 99;
+      
+      this.handleTrackTransition(event.index, event.trackId, event.queueEntryId, remainingItems, event.queueRevision);
     });
-  }
 
-  private async handleStoreChange(state: ReturnType<typeof usePlayerStore.getState>) {
-    const activeTrack = state.activeTrack;
-    const playbackState = state.playbackState;
-    const queue = state.queue;
+    DeviceEventEmitter.addListener('onPlaybackStateChange', (event: PlaybackStateChangeEvent) => {
+      this.handlePlaybackStateChange(event.state, event.isPlaying, event.isResolving, event.queueRevision);
+    });
 
-    // 1. Handle Playback State changes & History Tracking
-    if (playbackState !== this.currentPlaybackState) {
-      this.currentPlaybackState = playbackState;
-      await this.syncPlaybackIntent(playbackState);
-      this.manageHistoryTimer(playbackState, activeTrack);
-    }
+    DeviceEventEmitter.addListener('onCustomCommand', (event: { command: string }) => {
+      this.handleCustomCommand(event.command);
+    });
 
-    // 2. Handle Active Track changes (Forward-Only Sliding Window Engine)
-    if (activeTrack && activeTrack.id !== this.currentLoadedTrackId) {
-      this.currentLoadedTrackId = activeTrack.id;
-
-      // Reset history tracking for new track
-      this.cumulativeTime = 0;
-      this.playStartTime = playbackState === 'playing' ? Date.now() : 0;
-      this.historyRecordedForTrackId = null;
-      this.manageHistoryTimer(playbackState, activeTrack);
-
-      // Handle Radio Queue fetching if needed
-      this.checkRadioQueue(activeTrack, queue);
-
-      // Process Sliding Window
-      await this.processSlidingWindow(activeTrack, queue);
-    }
-  }
-
-  private async syncPlaybackIntent(playbackState: string) {
-    try {
-      const currentState = (await TrackPlayer.getPlaybackState()).state;
-      if (this.currentLoadedTrackId) {
-        if (playbackState === 'playing' && currentState !== State.Playing && currentState !== State.Buffering && currentState !== State.Loading) {
-          await TrackPlayer.play();
-        } else if (playbackState === 'paused' && currentState === State.Playing) {
-          await TrackPlayer.pause();
-        } else if (playbackState === 'stopped' && currentState !== State.Stopped) {
-          await TrackPlayer.stop();
-        }
+    DeviceEventEmitter.addListener('onVideoAvailabilityChanged', (event: { hasVideo: boolean }) => {
+      const store = usePlayerStore.getState();
+      if (!event.hasVideo && store.isVideoMode) {
+        useToastStore.getState().showToast('No video stream available. Switching to Audio...', 'info');
+        store.setIsVideoMode(false);
       }
-    } catch (err) {
-      console.error('[PlayerEngineManager] Sync Intent Error:', err);
+    });
+
+    // Synchronize background notification UI when critical player states change
+    usePlayerStore.subscribe((state, prevState) => {
+      if (
+        state.activeTrack?.id !== prevState.activeTrack?.id ||
+        state.isShuffle !== prevState.isShuffle ||
+        state.repeatMode !== prevState.repeatMode
+      ) {
+        this.syncNotificationUI(state);
+      }
+    });
+
+    // Push user preference changes (e.g. streaming quality) to Native Engine instantly
+    useSettingsStore.subscribe((state, prevState) => {
+      if (state.streamingQuality !== prevState.streamingQuality) {
+        HyperPlayer.setGlobalStreamingQuality(state.streamingQuality);
+      }
+    });
+
+    // Initial Sync
+    const initialQuality = useSettingsStore.getState().streamingQuality;
+    HyperPlayer.setGlobalStreamingQuality(initialQuality);
+  }
+
+  private async syncNotificationUI(state: ReturnType<typeof usePlayerStore.getState>) {
+    HyperPlayer.updateNotificationUI(state.repeatMode, state.isShuffle);
+  }
+
+  private handleCustomCommand(command: string) {
+    const store = usePlayerStore.getState();
+    if (command === 'toggle_shuffle') {
+      store.toggleShuffle();
+    } else if (command === 'toggle_repeat') {
+      store.toggleRepeat();
     }
   }
 
+  private handleTrackTransition(queueIndex: number, trackId: string, queueEntryId: string, remainingItems: number, queueRevision: number) {
+    const store = usePlayerStore.getState();
+    
+    /**
+     * We map the track using the explicit queueEntryId rather than raw array indices to 
+     * maintain accuracy during dynamic queue reordering (drag-and-drop).
+     */
+    let activeTrack = store.queue.find((t: any) => (t._queueId || t.id) === queueEntryId);
+    if (!activeTrack) {
+      activeTrack = store.queue[queueIndex]; // Fallback just in case
+    }
+
+    if (activeTrack) {
+      store.setActiveTrack(activeTrack);
+      
+      // History tracking logic
+      if (activeTrack.id !== this.currentLoadedTrackId) {
+        this.currentLoadedTrackId = activeTrack.id;
+        this.cumulativeTime = 0;
+        this.playStartTime = store.isPlaying ? Date.now() : 0;
+        this.historyRecordedForTrackId = null;
+        this.manageHistoryTimer(store.playbackState, activeTrack);
+
+        /**
+         * Timeline-aware Radio Fetch:
+         * Calculates if we need to append more auto-generated tracks when approaching the queue's end.
+         */
+        this.checkRadioQueue(activeTrack, remainingItems);
+      }
+    }
+  }
+
+  /**
+   * Maps native engine states to UI store states.
+   * Includes debouncing to prevent loading flashes during rapid transitions.
+   */
+  private handlePlaybackStateChange(state: string, isPlaying: boolean, isResolving: boolean, queueRevision: number) {
+    const store = usePlayerStore.getState();
+    
+    // Robust Mapping from Native State to UI State
+    let uiState: 'playing' | 'paused' | 'loading' | 'stopped' | 'error' | 'resolving' | 'buffering' = 'stopped';
+    
+    switch (state) {
+      case 'idle':
+        uiState = 'stopped';
+        break;
+      case 'buffering':
+        uiState = 'buffering';
+        break;
+      case 'ready':
+        uiState = isPlaying ? 'playing' : 'paused';
+        break;
+      case 'ended':
+        uiState = 'stopped'; // Depending on UI, could be paused, but stopped resets player visually
+        break;
+      case 'error':
+        const activeIndex = store.queue.findIndex((t: any) => t.id === store.activeTrack?.id);
+        const hasNext = activeIndex >= 0 && activeIndex < store.queue.length - 1;
+        
+        if (store.isVideoMode) {
+          // Fallback to audio mode upon video stream failure
+          useToastStore.getState().showToast('Video stream error. Switching to Audio...', 'error');
+          store.setIsVideoMode(false);
+          uiState = 'error';
+        } else if (hasNext) {
+          useToastStore.getState().showToast('Playback failed. Skipping to next...', 'error');
+          uiState = 'resolving'; // Represent error state as resolving to indicate automatic native recovery
+        } else {
+          useToastStore.getState().showToast('Playback failed. Please retry.', 'error');
+          uiState = 'error'; // Terminal error state
+        }
+        break;
+    }
+
+    /**
+     * Executes the final mapped state to the store.
+     * Extracts effective boolean flags for easy UI binding.
+     */
+    const applyState = () => {
+      const effectiveIsPlaying = (uiState === 'stopped' || uiState === 'error') ? false : isPlaying;
+      store.setPlaybackState(uiState);
+      store.setPlaybackFlags(effectiveIsPlaying, uiState === 'buffering', isResolving, queueRevision);
+      this.manageHistoryTimer(uiState, store.activeTrack);
+    };
+
+    if (uiState === 'buffering') {
+      if (!this.bufferingTimeout) {
+        this.bufferingTimeout = setTimeout(() => {
+          this.bufferingTimeout = null;
+          applyState();
+        }, 150);
+      }
+    } else {
+      if (this.bufferingTimeout) {
+        clearTimeout(this.bufferingTimeout);
+        this.bufferingTimeout = null;
+      }
+      applyState();
+    }
+  }
+
+  /**
+   * Manages a background 5-second interval timer.
+   * Once a track surpasses 30 seconds of cumulative active playback,
+   * it gets registered in the local SQLite history DB.
+   */
   private manageHistoryTimer(playbackState: string, activeTrack: Track | null) {
     if (this.playTimer) {
       clearInterval(this.playTimer);
@@ -100,13 +214,14 @@ class PlayerEngineManagerClass {
               const db = await SQLite.openDatabaseAsync('hypermusic.db', { useNewConnection: true } as any);
               const extractedTrack = {
                 id: activeTrack.id,
-                title: activeTrack.title,
-                artist: activeTrack.artist,
+                title: activeTrack.title || 'Unknown',
+                artist: activeTrack.artist || 'Unknown',
                 duration: activeTrack.duration || 0,
-                artworkUrl: typeof activeTrack.artwork === 'string' ? activeTrack.artwork : ''
+                artworkUrl: typeof activeTrack.artwork === 'string' ? activeTrack.artwork : '',
+                trackType: activeTrack.trackType || 'song',
               };
               await recordPlay(db, extractedTrack);
-              try { await db.closeAsync(); } catch (_) { }
+              try { await db.closeAsync(); } catch (_) {}
             } catch (e) {
               console.error('[PlayerEngineManager] Failed to record history', e);
             }
@@ -121,203 +236,50 @@ class PlayerEngineManagerClass {
     }
   }
 
-  private checkRadioQueue(activeTrack: Track, queue: Track[]) {
-    if (queue.length === 1 && queue[0].id === activeTrack.id) {
+  private lastRadioFetchRevision: number = 0;
+
+  private checkRadioQueue(activeTrack: Track, remainingItems: number) {
+    // Prefetch radio tracks when nearing the end of the current queue
+    if (remainingItems <= 2) {
+      const store = usePlayerStore.getState();
+      const isAutoPlayEnabled = useSettingsStore.getState().autoplay;
+
+      // Inject pre-fetched tracks from the pool without additional API calls
+      if (isAutoPlayEnabled && store.autoPlayPool.length >= 5) {
+        store.injectAutoPlayBatch();
+        return;
+      }
+
       if (this.fetchingRadioForId !== activeTrack.id) {
+        
+        // Synchronize radio fetch operations with the active queue revision
         this.fetchingRadioForId = activeTrack.id;
+        const currentRevision = store.queueRevision;
+        this.lastRadioFetchRevision = currentRevision;
 
         HyperExtractor.getRadioQueue(activeTrack.id).then((radioTracks: any[]) => {
+          // Discard fetch results if the active track has changed during the request
+          if (usePlayerStore.getState().activeTrack?.id !== activeTrack.id) {
+             return;
+          }
+
           if (radioTracks.length > 0) {
+            // Map to minimal payload to optimize bridge transfer overhead
             const mappedTracks: Track[] = radioTracks.map((t: any) => ({
               id: t.id,
               title: t.title,
               artist: t.artist,
               duration: t.duration,
               artwork: t.artworkUrl,
-              url: ''
+              url: '', // Lazy JIT resolution
+              trackType: t.type || t.trackType || 'song',
             }));
-            usePlayerStore.getState().appendTracks(mappedTracks);
+            usePlayerStore.getState().setAutoPlayPool(mappedTracks);
           }
         }).catch((err: any) => {
           console.error(`[PlayerEngineManager] ❌ Failed to fetch Radio Queue:`, err);
           this.fetchingRadioForId = null;
         });
-      }
-    }
-  }
-
-  private async processSlidingWindow(activeTrack: Track, queue: Track[]) {
-    // 1. Abort any ongoing extractions from rapid skips
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    const abortController = new AbortController();
-    this.abortController = abortController;
-    const signal = abortController.signal;
-
-    try {
-      const settings = useSettingsStore.getState();
-      const nextTrack = usePlayerStore.getState().getNextTrack();
-      const windowTracks = [activeTrack];
-
-      if (settings.autoplay && nextTrack) {
-        windowTracks.push(nextTrack);
-      }
-
-      const ensureExtracted = async (track: Track, retryCount = 1): Promise<Track | null> => {
-        // Check if track is already downloaded locally before hitting the extractor
-        const { audioFile } = downloadService.getLocalPaths(track.id);
-        if (audioFile.exists) {
-          const safeUrl = audioFile.uri;
-          usePlayerStore.getState().updateTrack(track.id, {
-            url: safeUrl,
-            isExtracted: true,
-            extractedAt: Date.now()
-          });
-          return { ...track, url: safeUrl, isExtracted: true, extractedAt: Date.now() };
-        }
-
-        const isLocalFile = track.url?.startsWith('file://');
-        const isExpired = !isLocalFile && (Date.now() - (track.extractedAt || 0) > EXPIRATION_TIME_MS);
-        let safeUrl = track.url;
-
-        if (!safeUrl || isExpired) {
-          try {
-            safeUrl = await extractorService.getStreamUrl(track.id, { signal });
-
-            if (signal.aborted) throw new Error('Aborted');
-
-            usePlayerStore.getState().updateTrack(track.id, {
-              url: safeUrl,
-              isExtracted: true,
-              extractedAt: Date.now()
-            });
-          } catch (err: any) {
-            if (err.message === 'Aborted') {
-              return null;
-            }
-            if (retryCount > 0 && !signal.aborted) {
-              console.warn(`[PlayerEngineManager] ⚠️ Extraction failed for ${track.id}, retrying...`);
-              await new Promise(res => setTimeout(res, 1000));
-              return await ensureExtracted(track, retryCount - 1);
-            }
-            console.error(`[PlayerEngineManager] ❌ Extraction Failed for ${track.id}:`, err);
-            throw err;
-          }
-        }
-
-        return {
-          ...track,
-          url: safeUrl,
-          artist: track.artist || 'Unknown Artist',
-          artwork: track.artworkUrl || track.artwork || require('../../../../../assets/default-artwork.png')
-        };
-      };
-
-      // Process Current Track
-      if (signal.aborted) return;
-      
-      // If syncing a new track, stop the old one bleeding immediately
-      const isExtractedLocally = windowTracks[0].isExtracted || windowTracks[0].url?.startsWith('file://') || downloadService.getLocalPaths(windowTracks[0].id).audioFile.exists;
-      if (!isExtractedLocally) {
-         const currentNativeActive = await TrackPlayer.getActiveTrackIndex();
-         if (currentNativeActive !== undefined && currentNativeActive !== -1) {
-             await TrackPlayer.pause();
-         }
-      }
-
-      usePlayerStore.getState().setPlaybackState('resolving');
-      usePlayerStore.getState().setPlaybackFlags(usePlayerStore.getState().isPlaying, true);
-
-      const currentTrackNative = await ensureExtracted(windowTracks[0]);
-      if (signal.aborted) return;
-      usePlayerStore.getState().setPlaybackState('loading');
-
-      if (!currentTrackNative) {
-        // Skip to next if autoplay enabled, otherwise error state
-        console.error(`[PlayerEngineManager] ❌ Current track failed to load: ${windowTracks[0].id}`);
-        if (settings.autoplay && nextTrack) {
-          usePlayerStore.getState().skipToNext();
-        } else {
-          usePlayerStore.getState().setPlaybackState('error');
-        }
-        return;
-      }
-
-      // 1. Synchronize Native Queue
-      const updatedNativeQueue = await TrackPlayer.getQueue();
-      const currentNativeIndex = updatedNativeQueue.findIndex(t => t.id === currentTrackNative.id);
-      const nativeActiveIndex = await TrackPlayer.getActiveTrackIndex();
-
-      let isNaturalAutoAdvance = false;
-
-      if (currentNativeIndex === -1) {
-        await TrackPlayer.add(currentTrackNative);
-        const finalQueue = await TrackPlayer.getQueue();
-        const newIndex = finalQueue.findIndex(t => t.id === currentTrackNative.id);
-        if (newIndex !== -1) await TrackPlayer.skip(newIndex);
-      } else if (nativeActiveIndex !== currentNativeIndex) {
-        await TrackPlayer.skip(currentNativeIndex);
-      } else {
-        isNaturalAutoAdvance = true;
-      }
-
-      if (!isNaturalAutoAdvance) {
-        const storeState = usePlayerStore.getState().playbackState;
-        if (storeState === 'playing' || storeState === 'loading' || storeState === 'resolving' || storeState === 'buffering') {
-          await TrackPlayer.play();
-          usePlayerStore.getState().setPlaybackState('playing');
-        }
-      } else {
-        const nativeState = (await TrackPlayer.getPlaybackState()).state;
-        if (nativeState === State.Playing) {
-          usePlayerStore.getState().setPlaybackState('playing');
-          usePlayerStore.getState().setPlaybackFlags(true, false);
-        }
-      }
-
-      // 3. Native Queue Cleanup (Index-Shift Protection)
-      const currentQueueAfterAdd = await TrackPlayer.getQueue();
-      const currentActiveIndexAfterAdd = await TrackPlayer.getActiveTrackIndex() ?? 0;
-      const windowIds = windowTracks.map(t => t.id);
-      const indicesToRemove: number[] = [];
-
-      currentQueueAfterAdd.forEach((nativeTrack, index) => {
-        if (!windowIds.includes(nativeTrack.id)) {
-          // Retain preceding tracks during auto-advance to prevent Android MediaSession index-shift crashes
-          if (isNaturalAutoAdvance && index < currentActiveIndexAfterAdd) {
-            return;
-          }
-          indicesToRemove.push(index);
-        }
-      });
-
-      if (indicesToRemove.length > 0) {
-        await TrackPlayer.remove(indicesToRemove);
-
-        // Re-assert play intent if manual track removal caused an index shift
-        if (!isNaturalAutoAdvance) {
-          const storeState = usePlayerStore.getState().playbackState;
-          if (storeState === 'playing' || storeState === 'loading' || storeState === 'resolving' || storeState === 'buffering') {
-            await TrackPlayer.play();
-          }
-        }
-      }
-
-      // Process Next Track (Prefetch)
-      if (windowTracks.length > 1 && !signal.aborted) {
-        const nextTrackNative = await ensureExtracted(windowTracks[1]);
-        if (!nextTrackNative || signal.aborted) return;
-
-        const finalNativeQueue = await TrackPlayer.getQueue();
-        if (finalNativeQueue.findIndex(t => t.id === nextTrackNative.id) === -1) {
-          await TrackPlayer.add(nextTrackNative);
-        }
-      }
-    } catch (error: any) {
-      if (error.message !== 'Aborted') {
-        console.error('[PlayerEngineManager] Engine Error:', error);
-        usePlayerStore.getState().setPlaybackState('error');
       }
     }
   }

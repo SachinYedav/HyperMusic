@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { SQLiteProvider } from 'expo-sqlite';
 import { initializeDatabase } from './schema';
 
@@ -54,14 +54,16 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
 
   return (
     <DatabaseErrorBoundary onRetry={() => setRetryKey(k => k + 1)}>
-      <SQLiteProvider 
-        key={retryKey}
-        databaseName="hypermusic.db" 
-        onInit={initializeDatabase}
-        useSuspense={false}
-      >
-        {children}
-      </SQLiteProvider>
+      <React.Suspense fallback={<View style={{flex: 1, backgroundColor: '#000'}} />}>
+        <SQLiteProvider 
+          key={retryKey}
+          databaseName="hypermusic.db" 
+          onInit={initializeDatabase}
+          useSuspense={true}
+        >
+          {children}
+        </SQLiteProvider>
+      </React.Suspense>
     </DatabaseErrorBoundary>
   );
 }

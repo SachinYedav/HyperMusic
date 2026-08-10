@@ -7,7 +7,8 @@ import { usePreferencesStore } from '@/store';
 import { Check, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
-import { HyperExtractor, BrowseShelf } from 'react-native-hyper-extractor';
+import { BrowseShelf } from 'react-native-hyper-extractor';
+import { extractorService } from '@/services/api/extractorService';
 
 interface FilterItem {
   id: string;
@@ -188,7 +189,7 @@ export function PersonalizeTasteScreen() {
     queryKey: ['liveMoodsAndGenres'],
     queryFn: async () => {
       try {
-        const shelves = await HyperExtractor.getExplorePage('FEmusic_moods_and_genres');
+        const shelves = await extractorService.getExplorePage('FEmusic_moods_and_genres');
         return shelves || [];
       } catch (error) {
         console.warn('[PersonalizeTasteScreen] Dynamic explore shelf retrieval failed:', error);

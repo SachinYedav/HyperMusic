@@ -1,6 +1,6 @@
-import { Share, Alert } from 'react-native';
-
-type ShareType = 'track' | 'playlist' | 'artist' | 'album';
+import { Share } from 'react-native';
+import { useToastStore } from '@/store/useToastStore';
+type ShareType = 'track' | 'playlist' | 'artist' | 'album' | 'podcast' | 'podcast_episode';
 
 export const shareContent = async (type: ShareType, id: string, name: string) => {
   let url = '';
@@ -19,13 +19,19 @@ export const shareContent = async (type: ShareType, id: string, name: string) =>
     case 'album':
       url = `https://music.youtube.com/playlist?list=${id}`; // Albums often use the playlist endpoint
       break;
+    case 'podcast':
+      url = `https://music.youtube.com/podcast/${id}`;
+      break;
+    case 'podcast_episode':
+      url = `https://music.youtube.com/watch?v=${id}`;
+      break;
     default:
       url = `https://music.youtube.com`;
   }
 
   try {
     const result = await Share.share({
-      message: `Listen to ${name} on HyperMusic: ${url}`,
+      message: `Listen to ${name} on YouTube Music: ${url}`,
       url: url, // iOS native share
       title: name, // Android native share
     });
@@ -40,7 +46,7 @@ export const shareContent = async (type: ShareType, id: string, name: string) =>
       // dismissed
     }
   } catch (error: any) {
-    Alert.alert('Error', 'Failed to share content');
+    useToastStore.getState().showToast('Failed to share content', 'error');
     console.error('Share Error:', error.message);
   }
 };

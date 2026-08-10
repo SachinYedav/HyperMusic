@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { HyperExtractor, BrowseShelf } from 'react-native-hyper-extractor';
+import { extractorService } from '@/services/api/extractorService';
 
 /**
  * React Query hook resolving explore taxonomy browse identifiers to native extractor catalog shelves.
@@ -9,7 +9,7 @@ import { HyperExtractor, BrowseShelf } from 'react-native-hyper-extractor';
 export function useExplorePage(categoryId: string) {
   return useQuery({
     queryKey: ['explorePage', categoryId],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       // Map frontend categoryId to browseId
       let browseId = '';
       if (categoryId.startsWith('FEmusic_')) {
@@ -33,7 +33,7 @@ export function useExplorePage(categoryId: string) {
         }
       }
 
-      const shelves = await HyperExtractor.getExplorePage(browseId);
+      const shelves = await extractorService.getExplorePage(browseId, { signal });
       return shelves;
     },
     staleTime: 1000 * 60 * 5,

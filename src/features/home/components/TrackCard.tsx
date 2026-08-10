@@ -1,17 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, StyleSheet, TouchableOpacity, TouchableHighlight, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrowseItem } from 'react-native-hyper-extractor';
 import { useTheme, spacing, radius, typography } from '@/theme';
 import { usePlayerStore } from '@/store';
 import { AnimatedEQ } from '@/ui/AnimatedEQ';
+import { PremiumImage } from '@/ui/PremiumImage';
 import { MoreVertical } from 'lucide-react-native';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
 
 interface TrackCardProps {
   track: BrowseItem;
   onPress: (track: BrowseItem) => void;
+  onLongPress?: (track: BrowseItem) => void;
 }
 
 const { width } = Dimensions.get('window');
@@ -19,7 +20,7 @@ const { width } = Dimensions.get('window');
 /**
  * Multi-format item card rendering dedicated widescreen video banners, square podcast layouts, and circular artist thumbnails.
  */
-export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
+export const TrackCard = React.memo(({ track, onPress, onLongPress }: TrackCardProps) => {
   const { colors } = useTheme();
   const isPlaying = usePlayerStore(state => state.activeTrack?.id === track.id && (track.type === 'song' || track.type === 'video' || track.type === 'podcast'));
 
@@ -30,13 +31,15 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
   if (isVideo) {
     const videoWidth = width * 0.88;
     return (
-      <TouchableOpacity
-        style={[styles.container, { width: videoWidth }]}
+      <TouchableHighlight
+        style={[styles.container, { width: videoWidth, borderRadius: radius.sm }]}
         onPress={() => onPress(track)}
-        activeOpacity={0.8}
+        onLongPress={() => onLongPress?.(track)}
+        activeOpacity={0.6}
+        underlayColor={colors.brand + '40'}
       >
-        <View style={[styles.premiumBanner, { width: videoWidth, aspectRatio: 16 / 9, borderRadius: radius.sm }]}>
-          <Image source={track.artworkUrl} style={styles.bannerImage} contentFit="cover" transition={200} />
+        <View style={[styles.premiumBanner, { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.sm }]}>
+          <PremiumImage source={{ uri: track.artworkUrl }} contextType="track" fallbackIconSize={32} style={styles.bannerImage} />
           <LinearGradient colors={[colors.overlayLight, 'transparent', colors.overlayDark]} style={styles.gradient} />
 
           <View style={styles.badgeContainer}>
@@ -48,20 +51,22 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
             <Text style={[styles.bannerSubtitle, { color: colors.white, opacity: 0.75 }]} numberOfLines={1}>{track.subtitle}</Text>
           </View>
         </View>
-      </TouchableOpacity>
+      </TouchableHighlight>
     );
   }
 
   if (isPodcast) {
     const podcastWidth = width * 0.85;
     return (
-      <TouchableOpacity
-        style={[styles.container, { width: podcastWidth }]}
+      <TouchableHighlight
+        style={[styles.container, { width: podcastWidth, borderRadius: radius.sm }]}
         onPress={() => onPress(track)}
-        activeOpacity={0.8}
+        onLongPress={() => onLongPress?.(track)}
+        activeOpacity={0.6}
+        underlayColor={colors.brand + '40'}
       >
-        <View style={[styles.premiumBanner, { width: podcastWidth, aspectRatio: 16 / 9, borderRadius: radius.sm }]}>
-          <Image source={track.artworkUrl} style={styles.bannerImage} contentFit="cover" transition={200} />
+        <View style={[styles.premiumBanner, { width: '100%', aspectRatio: 1, borderRadius: radius.md }]}>
+          <PremiumImage source={{ uri: track.artworkUrl }} contextType="podcast" fallbackIconSize={48} style={styles.bannerImage} />
           <LinearGradient colors={[colors.overlayLight, 'transparent', colors.overlayDark]} style={styles.gradient} />
 
           <View style={styles.badgeContainer}>
@@ -73,25 +78,28 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
             <Text style={[styles.bannerSubtitle, { color: colors.white, opacity: 0.75 }]} numberOfLines={1}>{track.subtitle}</Text>
           </View>
         </View>
-      </TouchableOpacity>
+      </TouchableHighlight>
     );
   }
 
   return (
-    <TouchableOpacity
-      style={[styles.container, { width: 140 }]}
+    <TouchableHighlight
+      style={[styles.container, { width: 140, borderRadius: isArtist ? radius.lg : radius.sm }]}
       onPress={() => onPress(track)}
-      activeOpacity={0.7}
+      onLongPress={() => onLongPress?.(track)}
+      activeOpacity={0.6}
+      underlayColor={colors.brand + '40'}
     >
-      <View style={{ width: 140, height: 140, overflow: 'hidden', borderRadius: isArtist ? 70 : radius.sm }}>
-        <Image
-          source={track.artworkUrl}
+      <View style={{ width: '100%' }}>
+      <View style={{ width: '100%', aspectRatio: 1, overflow: 'hidden', borderRadius: isArtist ? 70 : radius.sm }}>
+        <PremiumImage
+          source={{ uri: track.artworkUrl }}
+          contextType={(track.type === 'song' || track.type === 'video') ? 'track' : (track.type as any)}
           style={[
             { width: '100%', height: '100%', backgroundColor: colors.border },
             isArtist && { borderRadius: 70 }
           ]}
-          contentFit="cover"
-          transition={200}
+          fallbackIconSize={32}
         />
         {isPlaying && <AnimatedEQ isOverlay />}
       </View>
@@ -101,7 +109,7 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
             {track.title}
           </Text>
           <Text style={[styles.artist, { color: colors.textMuted }]} numberOfLines={1}>
-            {track.subtitle}
+            {track.subtitle}{(track as any).album && !track.subtitle.includes((track as any).album) ? ` • ${(track as any).album}` : ''}
           </Text>
         </View>
         {(track.type === 'song' || track.type === 'video' || track.type === 'podcast') && (
@@ -118,8 +126,10 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
                   artist: track.subtitle,
                   artworkUrl: track.artworkUrl,
                   coverUrl: track.artworkUrl,
-                  albumId: undefined,
-                  artistId: undefined
+                  albumId: (track as any).albumId,
+                  artistId: (track as any).artistId,
+                  artists: (track as any).artists,
+                  album: (track as any).album
                 }
               );
             }}
@@ -128,13 +138,15 @@ export const TrackCard = React.memo(({ track, onPress }: TrackCardProps) => {
           </TouchableOpacity>
         )}
       </View>
-    </TouchableOpacity>
+      </View>
+    </TouchableHighlight>
   );
 });
 
 const styles = StyleSheet.create({
   container: {
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
+    padding: 2,
   },
 
   premiumBanner: {

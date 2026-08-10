@@ -1,12 +1,12 @@
 import React, { useCallback } from 'react';
-import { FlatList, Dimensions, TouchableOpacity, Image as RNImage, View, Text, StyleSheet } from 'react-native';
+import { FlatList, Dimensions, TouchableOpacity, TouchableHighlight, View, Text, StyleSheet } from 'react-native';
 import { useTheme, spacing, typography, radius } from '@/theme';
 import { TrackCard } from './TrackCard';
 import { BrowseShelf, BrowseItem } from 'react-native-hyper-extractor';
 import { usePlayerStore } from '@/store';
 import { useNavigation } from '@react-navigation/native';
-import { Image } from 'expo-image';
-import { MoreVertical, Play } from 'lucide-react-native';
+import { PremiumImage } from '@/ui/PremiumImage';
+import { MoreVertical } from 'lucide-react-native';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
 import { AnimatedEQ } from '@/ui/AnimatedEQ';
 import { HeroBannerCard } from './HeroBannerCard';
@@ -49,17 +49,18 @@ export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }
         duration: 0,
         artwork: item.artworkUrl,
         url: '',
+        trackType: item.type,
       };
       // Always play as a single track so the Up Next radio engine fetches a fresh queue
       playTrack(internalTrack);
     } else if (item.type === 'album') {
-      navigation.navigate('AlbumDetails', { id: item.id });
+      navigation.navigate('AlbumDetails', { id: item.id, name: item.title, coverUrl: item.artworkUrl });
     } else if (item.type === 'playlist') {
-      navigation.navigate('PlaylistDetails', { id: item.id });
+      navigation.navigate('PlaylistDetails', { id: item.id, name: item.title, coverUrl: item.artworkUrl });
     } else if (item.type === 'artist') {
-      navigation.navigate('ArtistProfile', { id: item.id });
+      navigation.navigate('ArtistProfile', { id: item.id, artistName: item.title, artworkUrl: item.artworkUrl });
     } else if (item.type === 'podcast_show') {
-      navigation.navigate('PodcastDetails', { id: item.id });
+      navigation.navigate('PodcastDetails', { id: item.id, name: item.title, coverUrl: item.artworkUrl });
     }
   }, [playTrack, navigation]);
 
@@ -73,70 +74,90 @@ export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }
         duration: 0,
         artwork: i.artworkUrl,
         url: '',
+        trackType: i.type,
       }));
       playList(internalTracks as any[], 0);
     }
-  }, [section.items, playList]);
+  }, [section.items, playList, section.title]);
+
+  const handleOpenSheet = useCallback((track: BrowseItem) => {
+    const contextType = (track.type === 'song' || track.type === 'video') ? 'track' : track.type as any;
+    useActionSheetStore.getState().openSheet(
+      contextType,
+      {
+        id: track.id,
+        title: track.title,
+        artist: track.subtitle,
+        artworkUrl: track.artworkUrl,
+        albumId: undefined,
+        artistId: undefined
+      }
+    );
+  }, []);
 
   // Determine if this shelf should be rendered as Quick Picks (Grid)
-  const isQuickPicks = section.items.length > 0 && section.items.every((i: BrowseItem) => i.type === 'song');
+  const isQuickPicks = section.items.length > 0 && section.items.every((i: BrowseItem) => 
+    i.type === 'song' || i.type === 'video' || i.type === 'podcast' || i.type === 'artist'
+  );
 
-  const chunks = React.useMemo(() => isQuickPicks ? chunkArray(section.items, 4) : [], [section.items, isQuickPicks]);
+  const chunks = React.useMemo(() => isQuickPicks ? chunkArray(section.items, 5) : [], [section.items, isQuickPicks]);
 
   const isSingleChunk = chunks.length === 1;
   const colWidth = isSingleChunk ? width - (spacing.md * 2) : QUICK_PICK_COL_WIDTH;
   const chunkSnapInterval = colWidth + (isSingleChunk ? 0 : spacing.md);
 
-  const renderChunk = useCallback(({ item: chunk }: { item: BrowseItem[] }) => (
+  const renderChunk = useCallback(({ item: chunk, index: chunkIndex }: { item: BrowseItem[], index: number }) => (
     <View style={{ width: colWidth, marginRight: isSingleChunk ? 0 : spacing.md }}>
-      {chunk.map((track) => {
+      {chunk.map((track, trackIndex) => {
+        const globalIndex = chunkIndex * 5 + trackIndex + 1;
+        const isArtist = track.type === 'artist';
         const isPlaying = activeTrack?.id === track.id && (track.type === 'song' || track.type === 'video');
         return (
-          <TouchableOpacity
+          <TouchableHighlight
             key={track.id}
-            style={styles.quickPickRow}
+            style={[styles.quickPickRow, { paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: radius.sm, marginHorizontal: -spacing.sm }]}
             onPress={() => handleTrackPress(track)}
+            onLongPress={() => handleOpenSheet(track)}
+            underlayColor={colors.brand + '20'}
           >
-            <View style={{ width: 48, height: 48 }}>
-              <Image source={{ uri: track.artworkUrl }} style={[styles.quickPickImage, { width: '100%', height: '100%', backgroundColor: colors.border }]} contentFit="cover" />
-              {isPlaying && <AnimatedEQ isOverlay />}
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              {isArtist && (
+                <Text style={{ width: 28, fontSize: typography.body, fontWeight: 'bold', color: colors.textMuted, textAlign: 'center', marginRight: spacing.sm }}>
+                  {globalIndex}
+                </Text>
+              )}
+              <View style={{ width: 48, height: 48 }}>
+                <PremiumImage 
+                  source={{ uri: track.artworkUrl }} 
+                  contextType={isArtist ? 'artist' : (track.type === 'song' || track.type === 'video' ? 'track' : (track.type as any))}
+                  style={[styles.quickPickImage, { width: '100%', height: '100%', backgroundColor: colors.border }, isArtist && { borderRadius: radius.full }]} 
+                  fallbackIconSize={24}
+                />
+                {isPlaying && <AnimatedEQ isOverlay />}
+              </View>
+              <View style={styles.quickPickInfo}>
+                <Text style={[styles.quickPickTitle, { color: colors.text }]} numberOfLines={1}>{track.title}</Text>
+                <Text style={[styles.quickPickSubtitle, { color: colors.textMuted }]} numberOfLines={1}>{track.subtitle}</Text>
+              </View>
+              <TouchableOpacity
+                hitSlop={15}
+                style={{ padding: 4 }}
+                onPress={() => handleOpenSheet(track)}
+              >
+                <MoreVertical color={colors.text} size={20} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.quickPickInfo}>
-              <Text style={[styles.quickPickTitle, { color: colors.text }]} numberOfLines={1}>{track.title}</Text>
-              <Text style={[styles.quickPickSubtitle, { color: colors.textMuted }]} numberOfLines={1}>{track.subtitle}</Text>
-            </View>
-            <TouchableOpacity
-              hitSlop={10}
-              style={{ padding: 4 }}
-              onPress={() => {
-                const contextType = (track.type === 'song' || track.type === 'video') ? 'track' : track.type as any;
-                useActionSheetStore.getState().openSheet(
-                  contextType,
-                  {
-                    id: track.id,
-                    title: track.title,
-                    artist: track.subtitle,
-                    artworkUrl: track.artworkUrl,
-                    albumId: undefined,
-                    artistId: undefined
-                  }
-                );
-              }}
-            >
-              <MoreVertical color={colors.text} size={20} />
-            </TouchableOpacity>
-          </TouchableOpacity>
+          </TouchableHighlight>
         );
       })}
     </View>
   ), [handleTrackPress, colors.text, colors.textMuted, activeTrack?.id, colWidth, isSingleChunk]);
 
   const renderCard = useCallback(({ item }: { item: BrowseItem }) => (
-    <TrackCard track={item} onPress={handleTrackPress} />
-  ), [handleTrackPress]);
+    <TrackCard track={item} onPress={handleTrackPress} onLongPress={handleOpenSheet} />
+  ), [handleTrackPress, handleOpenSheet]);
 
-  const isVideoShelf = section.items.length > 0 && section.items.some((i: BrowseItem) => i.type === 'video');
-  const showPlayAll = isQuickPicks || isVideoShelf;
+  const showPlayAll = section.items.length > 0 && section.items.every((i: BrowseItem) => i.type === 'song' || i.type === 'video');
 
   const Header = () => (
     <View style={styles.headerRow}>
@@ -247,7 +268,7 @@ const styles = StyleSheet.create({
   quickPickRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
   quickPickImage: {
     width: 48,

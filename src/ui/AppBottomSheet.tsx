@@ -1,14 +1,16 @@
 import React, { useCallback, useRef } from 'react';
-import { Modal, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
+import { Modal, StyleSheet, Platform, KeyboardAvoidingView, View, Dimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView, BottomSheetScrollView, BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, spacing, radius } from '@/theme';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface AppBottomSheetProps {
   visible: boolean;
   onClose: () => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   headerComponent?: React.ReactNode;
   scrollable?: boolean;
   maxDynamicContentSize?: number;
@@ -16,6 +18,12 @@ interface AppBottomSheetProps {
   keyboardAvoiding?: boolean;
   /** Whether the bottom sheet floats detached with margins (default: true) */
   detached?: boolean;
+  /** If provided, AppBottomSheet will render a BottomSheetFlatList instead of standard children */
+  flatListProps?: any;
+  /** Ensures the sheet never shrinks below a premium minimum height */
+  minHeight?: number;
+  /** Disables closing via swipe or backdrop tap */
+  disableClose?: boolean;
 }
 
 /**
@@ -28,9 +36,12 @@ export function AppBottomSheet({
   children,
   headerComponent,
   scrollable = false,
-  maxDynamicContentSize,
+  maxDynamicContentSize = SCREEN_HEIGHT * 0.85,
   keyboardAvoiding = false,
   detached = true,
+  flatListProps,
+  minHeight = 250,
+  disableClose = false,
 }: AppBottomSheetProps) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -49,10 +60,10 @@ export function AppBottomSheet({
         disappearsOnIndex={-1}
         appearsOnIndex={0}
         opacity={0.5}
-        pressBehavior="close"
+        pressBehavior={disableClose ? "none" : "close"}
       />
     ),
-    []
+    [disableClose]
   );
 
   const ContentWrapper = scrollable ? BottomSheetScrollView : BottomSheetView;
@@ -64,8 +75,9 @@ export function AppBottomSheet({
         index={0}
         enableDynamicSizing={true}
         maxDynamicContentSize={maxDynamicContentSize}
-        enablePanDownToClose={true}
-        enableContentPanningGesture={!scrollable}
+        keyboardBehavior={Platform.OS === 'ios' ? "interactive" : "extend"}
+        enablePanDownToClose={!disableClose}
+        enableContentPanningGesture={!(scrollable || !!flatListProps)}
         detached={detached}
         bottomInset={detached ? insets.bottom + spacing.md : 0}
         style={detached ? { marginHorizontal: spacing.md } : { marginHorizontal: 0 }}
@@ -85,14 +97,25 @@ export function AppBottomSheet({
         animateOnMount={true}
       >
         {headerComponent}
-        <ContentWrapper 
-          style={[styles.contentContainer, !detached && { paddingBottom: insets.bottom + spacing.lg }]}
-          contentContainerStyle={scrollable ? [styles.scrollContent, !detached && { paddingBottom: insets.bottom + spacing.lg }] : undefined}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {children}
-        </ContentWrapper>
+        {flatListProps ? (
+          <BottomSheetFlatList
+            {...flatListProps}
+            scrollEnabled={flatListProps.data?.length > 0}
+            contentContainerStyle={[
+              { minHeight },
+              flatListProps.contentContainerStyle
+            ]}
+          />
+        ) : (
+          <ContentWrapper 
+            style={[styles.contentContainer, !detached && { paddingBottom: insets.bottom + spacing.lg }, { minHeight }]}
+            contentContainerStyle={scrollable ? [styles.scrollContent, !detached && { paddingBottom: insets.bottom + spacing.lg }, { minHeight }] : undefined}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ContentWrapper>
+        )}
       </BottomSheet>
     </GestureHandlerRootView>
   );

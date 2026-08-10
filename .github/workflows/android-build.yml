@@ -32,10 +32,9 @@ jobs:
         run: npm ci
 
       - name: Generate Nitro C++ Bindings (Nitrogen)
-        working-directory: ./modules/react-native-hyper-extractor
         run: |
-          npm install
-          npm run codegen
+          cd modules/react-native-hyper-extractor && npm run codegen
+          cd ../react-native-hyper-player && npm run codegen
 
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --clean

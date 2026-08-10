@@ -1,6 +1,7 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { ExtractedTrack, BrowseItem } from 'react-native-hyper-extractor';
-import { upsertTrack, libraryEmitter } from './libraryService';
+import { upsertTrack } from '@/database/queries';
+import { upsertPlaybackHistory, prunePlaybackHistory, clearAllPlaybackHistory, removeTrackFromHistory, getRecentPlaybackHistory, getTopPlayedTracks } from '@/database/queries/historyQueries';
 
 /**
  * Records a playback event in the SQLite database within an exclusive transaction, upserting track entity metadata and incrementing play counts.
@@ -15,31 +16,16 @@ export async function recordPlay(db: SQLiteDatabase, track: ExtractedTrack) {
     // Wrap in a standard transaction to prevent exclusive WAL filesystem deadlocks
     await db.withTransactionAsync(async () => {
       // 1. Ensure track exists
-      await db.runAsync(
-        `INSERT INTO Tracks (id, title, artist, artistId, album, duration, artworkUrl) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET 
-            title=excluded.title, 
-            artist=excluded.artist, 
-            artworkUrl=excluded.artworkUrl`,
-        [track.id, track.title, track.artist, track.artistId || null, null, track.duration || 0, track.artworkUrl || null]
-      );
+      await upsertTrack(db, track);
 
       // 2. Insert or update PlaybackHistory
-      await db.runAsync(
-        `INSERT INTO PlaybackHistory (trackId, playCount, lastPlayedAt) 
-         VALUES (?, 1, ?)
-         ON CONFLICT(trackId) DO UPDATE SET 
-            playCount = playCount + 1,
-            lastPlayedAt = excluded.lastPlayedAt`,
-        [track.id, now]
-      );
+      await upsertPlaybackHistory(db, track.id, now);
     });
 
     // 3. Prune history to avoid infinite database growth
     await pruneHistory(db);
 
-    libraryEmitter.emit();
+    
   } catch (error) {
     console.error('[HistoryService] Failed to record play:', error);
     // Silent fail to avoid crashing the playback flow
@@ -52,21 +38,7 @@ export async function recordPlay(db: SQLiteDatabase, track: ExtractedTrack) {
  */
 async function pruneHistory(db: SQLiteDatabase, limit: number = 100) {
   try {
-    const countResult = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM PlaybackHistory`);
-    const totalCount = countResult?.count || 0;
-
-    if (totalCount > limit) {
-      // Delete the oldest records that exceed the limit
-      await db.runAsync(
-        `DELETE FROM PlaybackHistory WHERE trackId IN (
-           SELECT trackId FROM PlaybackHistory 
-           ORDER BY lastPlayedAt ASC 
-           LIMIT ?
-         )`,
-        [totalCount - limit]
-      );
-      // console.log(`[HistoryService] Pruned ${totalCount - limit} old history records.`);
-    }
+    await prunePlaybackHistory(db, limit);
   } catch (error) {
     console.error('[HistoryService] Failed to prune history:', error);
   }
@@ -75,21 +47,11 @@ async function pruneHistory(db: SQLiteDatabase, limit: number = 100) {
 /**
  * Returns recently played tracks mapped to BrowseItem format for Home feed injection
  */
-export async function getRecentPlays(db: SQLiteDatabase, limit: number = 10): Promise<BrowseItem[]> {
-  const result = await db.getAllAsync<{
-    id: string; title: string; artist: string; artworkUrl: string; lastPlayedAt: number;
-  }>(
-    `SELECT t.id, t.title, t.artist, t.artworkUrl, h.lastPlayedAt
-     FROM PlaybackHistory h
-     JOIN Tracks t ON t.id = h.trackId
-     ORDER BY h.lastPlayedAt DESC
-     LIMIT ?`,
-    [limit]
-  );
-
+export async function getRecentPlays(db: SQLiteDatabase, limit: number = 20): Promise<BrowseItem[]> {
+  const result = await getRecentPlaybackHistory(db, limit);
   return result.map(row => ({
     id: row.id,
-    type: 'song',
+    type: row.trackType || 'song',
     title: row.title,
     subtitle: row.artist,
     artworkUrl: row.artworkUrl
@@ -99,21 +61,11 @@ export async function getRecentPlays(db: SQLiteDatabase, limit: number = 10): Pr
 /**
  * Returns heavily rotated tracks (top played) mapped to BrowseItem format for Home feed injection
  */
-export async function getHeavyRotation(db: SQLiteDatabase, limit: number = 10): Promise<BrowseItem[]> {
-  const result = await db.getAllAsync<{
-    id: string; title: string; artist: string; artworkUrl: string; playCount: number;
-  }>(
-    `SELECT t.id, t.title, t.artist, t.artworkUrl, h.playCount
-     FROM PlaybackHistory h
-     JOIN Tracks t ON t.id = h.trackId
-     ORDER BY h.playCount DESC, h.lastPlayedAt DESC
-     LIMIT ?`,
-    [limit]
-  );
-
+export async function getHeavyRotation(db: SQLiteDatabase, limit: number = 20): Promise<BrowseItem[]> {
+  const result = await getTopPlayedTracks(db, limit);
   return result.map(row => ({
     id: row.id,
-    type: 'song',
+    type: row.trackType || 'song',
     title: row.title,
     subtitle: row.artist,
     artworkUrl: row.artworkUrl
@@ -125,8 +77,8 @@ export async function getHeavyRotation(db: SQLiteDatabase, limit: number = 10): 
  */
 export async function clearHistory(db: SQLiteDatabase): Promise<void> {
   try {
-    await db.runAsync(`DELETE FROM PlaybackHistory`);
-    libraryEmitter.emit();
+    await clearAllPlaybackHistory(db);
+    
   } catch (error) {
     console.error('[HistoryService] Failed to clear history:', error);
   }
@@ -137,8 +89,8 @@ export async function clearHistory(db: SQLiteDatabase): Promise<void> {
  */
 export async function deleteHistoryItem(db: SQLiteDatabase, trackId: string): Promise<void> {
   try {
-    await db.runAsync(`DELETE FROM PlaybackHistory WHERE trackId = ?`, [trackId]);
-    libraryEmitter.emit();
+    await removeTrackFromHistory(db, trackId);
+    
   } catch (error) {
     console.error('[HistoryService] Failed to delete history item:', error);
   }

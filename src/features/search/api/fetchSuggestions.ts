@@ -1,12 +1,12 @@
 import { SEARCH_SUGGESTION_LIMIT } from '../constants/searchConstants';
-import { HyperExtractor } from 'react-native-hyper-extractor';
+import { extractorService } from '@/services/api/extractorService';
 
 export async function fetchSearchSuggestions(query: string, signal?: AbortSignal) {
   const cleanQuery = query.trim().slice(0, 100).toLowerCase();
   if (cleanQuery.length < 2) return [];
 
   try {
-    const rawSuggestions = await HyperExtractor.getSearchSuggestions(cleanQuery);
+    const rawSuggestions = await extractorService.getSearchSuggestions(cleanQuery, { signal });
     
     // Sanitize and limit
     const seen = new Set<string>();

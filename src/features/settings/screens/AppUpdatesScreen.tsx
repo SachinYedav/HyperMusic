@@ -61,7 +61,7 @@ export function AppUpdatesScreen() {
     setUpdateChecked(true);
 
     if (response.status === 'success' && response.data) {
-      const isNewer = updateService.isUpdateAvailable(response.data.latestVersion);
+      const isNewer = updateService.isUpdateAvailable(response.data.versionCode);
       setUpdateAvailable(isNewer);
       if (isNewer) {
         setUpdateData(response.data);

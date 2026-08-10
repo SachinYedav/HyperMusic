@@ -1,118 +1,83 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Linking, AppState, PermissionsAndroid, Platform } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
 import { Screen } from '@/ui/Screen';
 import { useThemeStore, useSettingsStore } from '@/store';
-import { Check, Moon, Sun, Smartphone, Headphones, DownloadCloud, Trash2, Repeat, Wifi, Info, Music, Settings as SettingsIcon, ChevronRight, Handshake, Scale, RefreshCw } from 'lucide-react-native';
-import { AppBottomSheet } from '@/ui/AppBottomSheet';
-import { Image } from 'expo-image';
-import { Directory, Paths } from 'expo-file-system';
+import { Moon, Sun, Smartphone, Headphones, DownloadCloud, HardDrive, Repeat, Wifi, Info, Music, Settings as SettingsIcon, ChevronRight, RefreshCw, Handshake, Scale, Code, Bug, Sliders, User, Clock, Bell, Mic, Wand2 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SettingsStackParamList } from '@/navigation/types';
 import Constants from 'expo-constants';
-
-const SettingsSection = ({ title, children, colors }: any) => (
-  <View style={styles.sectionContainer}>
-    {title && <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>}
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
-      {children}
-    </View>
-  </View>
-);
-
-const SettingsSwitchRow = ({ icon: Icon, label, value, onValueChange, isLast, colors, isDark }: any) => (
-  <View style={[styles.optionRow, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-    <View style={styles.optionLeft}>
-      <Icon color={colors.text} size={20} />
-      <Text style={[styles.optionLabel, { color: colors.text }]}>{label}</Text>
-    </View>
-    <Switch
-      value={value}
-      onValueChange={onValueChange}
-      trackColor={{ false: colors.surfaceMuted, true: colors.brand }}
-      thumbColor={colors.white}
-      ios_backgroundColor={colors.surfaceMuted}
-      style={{ transform: [{ scale: 0.9 }] }}
-    />
-  </View>
-);
-
-const SettingsActionRow = ({ icon: Icon, label, valueLabel, onPress, isLast, colors, isDark, danger, success, hideChevron }: any) => {
-  const textColor = success ? '#4CAF50' : (danger ? colors.brand : colors.text);
-  return (
-    <TouchableOpacity
-      style={[styles.optionRow, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <View style={styles.optionLeft}>
-        <Icon color={textColor} size={20} />
-        <Text style={[styles.optionLabel, { color: textColor }]}>{label}</Text>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {valueLabel && <Text style={{ color: colors.textMuted, marginRight: hideChevron ? 0 : 8 }}>{valueLabel}</Text>}
-        {!hideChevron && <ChevronRight color={colors.textMuted} size={16} />}
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-const SettingsSelectRow = ({ options, selectedValue, onSelect, isLast, colors, isDark }: any) => {
-  return (
-    <>
-      {options.map((option: any, index: number) => {
-        const isSelected = selectedValue === option.id;
-        const OptionIcon = option.icon;
-        return (
-          <TouchableOpacity
-            key={option.id}
-            style={[
-              styles.optionRow,
-              (!isLast || index < options.length - 1) && {
-                borderBottomWidth: 1,
-                borderBottomColor: colors.border,
-              },
-            ]}
-            onPress={() => onSelect(option.id)}
-          >
-            <View style={styles.optionLeft}>
-              {OptionIcon && <OptionIcon color={colors.text} size={20} />}
-              <Text style={[styles.optionLabel, { color: colors.text }]}>{option.label}</Text>
-            </View>
-            {isSelected && <Check color={colors.brand} size={20} />}
-          </TouchableOpacity>
-        );
-      })}
-    </>
-  );
-};
-
+import { SettingsSection, SettingsSwitchRow, SettingsActionRow, SettingsSelectRow } from '../components/SettingsComponents';
+import { SettingsSelectionSheet } from '../components/SettingsSelectionSheet';
 /**
  * Global application settings workspace managing theme mode preferences, streaming/download quality configurations, and local cache invalidation.
  */
 export function SettingsScreen() {
   const { colors, isDark } = useTheme();
-  const { mode, setMode } = useThemeStore();
+  const themeState = useThemeStore();
   const settings = useSettingsStore();
   const [sheetConfig, setSheetConfig] = useState({ visible: false, type: '' });
-  const [cacheCleared, setCacheCleared] = useState(false);
   const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList>>();
 
-  const handleClearCache = async () => {
-    try {
-      await Image.clearMemoryCache();
-      await Image.clearDiskCache();
+  const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
+  const [hasMicPermission, setHasMicPermission] = useState(false);
 
-      const cacheDir = new Directory(Paths.cache);
-      if (cacheDir.exists) {
-        // Clear expo-file-system cache if needed, but Image cache is 99% of it
+  useEffect(() => {
+    const checkPerm = async () => {
+      if (Platform.OS === 'android') {
+        const micGranted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+        setHasMicPermission(micGranted);
+
+        if (Platform.Version >= 33) {
+          const notifGranted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+          setHasNotificationPermission(notifGranted);
+        } else {
+          setHasNotificationPermission(true);
+        }
+      } else {
+        setHasNotificationPermission(true);
+        setHasMicPermission(true);
       }
+    };
+    checkPerm();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkPerm();
+    });
+    return () => sub.remove();
+  }, []);
 
-      setCacheCleared(true);
-      setTimeout(() => setCacheCleared(false), 3000);
-    } catch (error) {
-      console.error('Failed to clear cache', error);
+  const handleNotificationToggle = async (val: boolean) => {
+    if (Platform.OS === 'android') {
+      if (val && !hasNotificationPermission) {
+        if (Platform.Version >= 33) {
+          const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+          if (result === PermissionsAndroid.RESULTS.GRANTED) {
+            setHasNotificationPermission(true);
+          } else if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+            Linking.openSettings();
+          }
+        } else {
+          Linking.openSettings();
+        }
+      } else if (!val && hasNotificationPermission) {
+        Linking.openSettings();
+      }
+    }
+  };
+
+  const handleMicToggle = async (val: boolean) => {
+    if (Platform.OS === 'android') {
+      if (val && !hasMicPermission) {
+        const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+        if (result === PermissionsAndroid.RESULTS.GRANTED) {
+          setHasMicPermission(true);
+        } else if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+          Linking.openSettings();
+        }
+      } else if (!val && hasMicPermission) {
+        Linking.openSettings();
+      }
     }
   };
 
@@ -140,8 +105,8 @@ export function SettingsScreen() {
         <SettingsSection colors={colors}>
           <SettingsSelectRow
             options={themeOptions}
-            selectedValue={mode}
-            onSelect={setMode}
+            selectedValue={themeState.mode}
+            onSelect={themeState.setMode}
             isLast={true}
             colors={colors}
             isDark={isDark}
@@ -150,10 +115,38 @@ export function SettingsScreen() {
 
         <SettingsSection title="Personalization" colors={colors}>
           <SettingsActionRow
+            icon={Wand2}
+            label="Home Background Theme"
+            valueLabel={themeState.homeBackgroundTheme.charAt(0).toUpperCase() + themeState.homeBackgroundTheme.slice(1)}
+            onPress={() => setSheetConfig({ visible: true, type: 'theme' })}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsActionRow
             icon={Music}
             label="Personalize Music Taste"
             valueLabel=""
             onPress={() => navigation.navigate('PersonalizeTaste')}
+            isLast={true}
+            colors={colors}
+            isDark={isDark}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="App Permissions" colors={colors}>
+          <SettingsSwitchRow
+            icon={Bell}
+            label="Push Notifications"
+            value={hasNotificationPermission}
+            onValueChange={handleNotificationToggle}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsSwitchRow
+            icon={Mic}
+            label="Microphone (Voice Search)"
+            value={hasMicPermission}
+            onValueChange={handleMicToggle}
             isLast={true}
             colors={colors}
             isDark={isDark}
@@ -206,12 +199,35 @@ export function SettingsScreen() {
             isDark={isDark}
           />
           <SettingsActionRow
-            icon={cacheCleared ? Check : Trash2}
-            label={cacheCleared ? "Cleared" : "Clear Cache"}
+            icon={HardDrive}
+            label="Storage Management"
             valueLabel=""
-            danger={!cacheCleared}
-            success={cacheCleared}
-            onPress={handleClearCache}
+            onPress={() => navigation.navigate('StorageSettings')}
+            isLast={true}
+            colors={colors}
+            isDark={isDark}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Coming Soon" colors={colors}>
+          <SettingsActionRow
+            icon={User}
+            label="Local Profile"
+            onPress={() => { }}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsActionRow
+            icon={Sliders}
+            label="Equalizer"
+            onPress={() => { }}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsActionRow
+            icon={Clock}
+            label="Sleep Timer"
+            onPress={() => { }}
             isLast={true}
             colors={colors}
             isDark={isDark}
@@ -245,6 +261,20 @@ export function SettingsScreen() {
             icon={Scale}
             label="Open Source Licenses"
             onPress={() => navigation.navigate('Licenses')}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsActionRow
+            icon={Code}
+            label="Source Code (GitHub)"
+            onPress={() => Linking.openURL('https://github.com/SachinYedav/hypermusic')}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsActionRow
+            icon={Bug}
+            label="Report a Bug"
+            onPress={() => Linking.openURL('https://github.com/SachinYedav/hypermusic/issues')}
             isLast={true}
             colors={colors}
             isDark={isDark}
@@ -253,34 +283,33 @@ export function SettingsScreen() {
 
       </ScrollView>
 
-      <AppBottomSheet visible={sheetConfig.visible} onClose={() => setSheetConfig({ visible: false, type: '' })}>
-        <View style={{ paddingBottom: spacing.xl, paddingTop: spacing.md }}>
-          <Text style={[styles.sheetTitle, { color: colors.text }]}>
-            {sheetConfig.type === 'streaming' ? 'Streaming Quality' : 'Download Quality'}
-          </Text>
-          {qualityOptions.map((opt) => {
-            const isActive = sheetConfig.type === 'streaming' ? settings.streamingQuality === opt.id : settings.downloadQuality === opt.id;
-            return (
-              <TouchableOpacity
-                key={opt.id}
-                style={[styles.sheetRow, isActive && { backgroundColor: colors.surface }]}
-                onPress={() => {
-                  if (sheetConfig.type === 'streaming') settings.setStreamingQuality(opt.id);
-                  else settings.setDownloadQuality(opt.id);
-                  setSheetConfig({ visible: false, type: '' });
-                }}
-              >
-                <View style={[styles.radioOuter, { borderColor: isActive ? colors.brand : colors.textMuted }]}>
-                  {isActive && <View style={[styles.radioInner, { backgroundColor: colors.brand }]} />}
-                </View>
-                <Text style={{ flex: 1, color: colors.text, fontSize: typography.bodyLg, fontWeight: isActive ? 'bold' : 'normal' }}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </AppBottomSheet>
+      <SettingsSelectionSheet
+        visible={sheetConfig.visible && (sheetConfig.type === 'streaming' || sheetConfig.type === 'download')}
+        onClose={() => setSheetConfig({ visible: false, type: '' })}
+        title={sheetConfig.type === 'streaming' ? 'Streaming Quality' : 'Download Quality'}
+        options={qualityOptions.map(opt => ({ id: opt.id, label: opt.label }))}
+        selectedValue={sheetConfig.type === 'streaming' ? settings.streamingQuality : settings.downloadQuality}
+        onSelect={(val) => {
+          if (sheetConfig.type === 'streaming') settings.setStreamingQuality(val as any);
+          else settings.setDownloadQuality(val as any);
+        }}
+      />
+
+      <SettingsSelectionSheet
+        visible={sheetConfig.visible && sheetConfig.type === 'theme'}
+        onClose={() => setSheetConfig({ visible: false, type: '' })}
+        title="Home Background Theme"
+        options={[
+          { id: 'auto', label: 'Auto (Random)' },
+          { id: 'purple', label: 'Classic Purple' },
+          { id: 'midnight', label: 'Midnight Blue' },
+          { id: 'crimson', label: 'Crimson Red' },
+          { id: 'emerald', label: 'Emerald Green' },
+          { id: 'sunset', label: 'Sunset Orange' },
+        ]}
+        selectedValue={themeState.homeBackgroundTheme}
+        onSelect={(val) => themeState.setHomeBackgroundTheme(val as any)}
+      />
     </Screen>
   );
 }
@@ -327,31 +356,5 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: typography.body,
     fontWeight: '500',
-  },
-  sheetTitle: {
-    fontSize: typography.title,
-    fontWeight: 'bold',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  sheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
-  },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
   },
 });

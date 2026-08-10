@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSafeDatabase } from '@/database/useSafeDatabase';
-import { libraryEmitter } from '../services/libraryService';
+import { useLibraryStore } from '@/store/useLibraryStore';
+
 import { ExtractedTrack } from 'react-native-hyper-extractor';
+import { 
+  getLikedTracks, 
+  getAllPlaylists, 
+  getAllAlbums, 
+  getDownloadedTracks, 
+  getFullPlaybackHistory,
+  getSavedArtists 
+} from '@/database/queries';
 
 export interface Playlist {
   id: string;
@@ -20,9 +29,11 @@ export interface Album {
 }
 
 export interface ArtistSummary {
-  artist: string;
-  artistId?: string;
-  trackCount: number;
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  subscriberCount: string | null;
+  savedAt: number;
 }
 
 /**
@@ -31,23 +42,17 @@ export interface ArtistSummary {
 export function useLikedSongs() {
   const db = useSafeDatabase();
   const [songs, setSongs] = useState<ExtractedTrack[]>([]);
+  const libraryRevision = useLibraryStore(state => state.libraryRevision);
 
   const fetchSongs = useCallback(async () => {
     if (!db) return;
-    try {
-      const results = await db.getAllAsync<ExtractedTrack>(
-        `SELECT * FROM Tracks WHERE isLiked = 1 ORDER BY addedAt DESC`
-      );
-      setSongs(results);
-    } catch (error) {
-      console.error('Failed to fetch liked songs:', error);
-    }
-  }, [db]);
+    const results = await getLikedTracks(db);
+    setSongs(results);
+  }, [db, libraryRevision]);
 
   useEffect(() => {
     fetchSongs();
-    return libraryEmitter.subscribe(fetchSongs);
-  }, [fetchSongs]);
+  }, [fetchSongs, libraryRevision]);
 
   return songs;
 }
@@ -58,92 +63,38 @@ export function useLikedSongs() {
 export function usePlaylists() {
   const db = useSafeDatabase();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const libraryRevision = useLibraryStore(state => state.libraryRevision);
 
   const fetchPlaylists = useCallback(async () => {
     if (!db) return;
-    try {
-      const results = await db.getAllAsync<Playlist>(
-        `SELECT * FROM Playlists ORDER BY createdAt DESC`
-      );
-      setPlaylists(results);
-    } catch (error) {
-      console.error('Failed to fetch playlists:', error);
-    }
-  }, [db]);
+    const results = await getAllPlaylists(db);
+    setPlaylists(results);
+  }, [db, libraryRevision]);
 
   useEffect(() => {
     fetchPlaylists();
-    return libraryEmitter.subscribe(fetchPlaylists);
-  }, [fetchPlaylists]);
+  }, [fetchPlaylists, libraryRevision]);
 
   return playlists;
 }
 
 /**
- * Hook to reactively fetch grouped artists and their track counts from the explicit library.
- * Filters out unliked history tracks and cleanly splits composite artist strings.
+ * Hook to reactively fetch user-saved artists from the explicit library.
  */
 export function useArtists() {
   const db = useSafeDatabase();
   const [artists, setArtists] = useState<ArtistSummary[]>([]);
+  const libraryRevision = useLibraryStore(state => state.libraryRevision);
 
   const fetchArtists = useCallback(async () => {
     if (!db) return;
-    try {
-      // 1. Fetch only tracks explicitly liked or downloaded (avoiding infinite growth from history)
-      const results = await db.getAllAsync<{ artist: string; artistId: string | null }>(
-        `SELECT artist, artistId FROM Tracks WHERE isLiked = 1 OR id IN (SELECT trackId FROM Downloads)`
-      );
-
-      if (!results || results.length === 0) {
-        setArtists([]);
-        return;
-      }
-
-      // 2. Safely parse and normalize composite artist strings
-      const artistMap = new Map<string, { artistId?: string; trackCount: number }>();
-
-      results.forEach(row => {
-        if (!row || !row.artist) return;
-        // Split composite artists like "Arijit Singh, Shreya Ghoshal" or "Pritam & Arijit Singh"
-        const splits = row.artist.split(/, |\b & \b|\b feat\.?\b|\b ft\.?\b/i);
-        
-        splits.forEach(artistName => {
-          const cleanName = artistName.trim();
-          if (!cleanName) return;
-
-          const existing = artistMap.get(cleanName);
-          if (existing) {
-            existing.trackCount += 1;
-            if (!existing.artistId && row.artistId) {
-              existing.artistId = row.artistId;
-            }
-          } else {
-            artistMap.set(cleanName, {
-              artistId: row.artistId || undefined,
-              trackCount: 1,
-            });
-          }
-        });
-      });
-
-      const summaries: ArtistSummary[] = Array.from(artistMap.entries()).map(([artist, data]) => ({
-        artist,
-        artistId: data.artistId,
-        trackCount: data.trackCount,
-      })).sort((a, b) => a.artist.localeCompare(b.artist));
-
-      setArtists(summaries);
-    } catch (error) {
-      console.error('Failed to fetch artists:', error);
-      setArtists([]); // Robust fallback to prevent crashes
-    }
-  }, [db]);
+    const results = await getSavedArtists(db);
+    setArtists(results);
+  }, [db, libraryRevision]);
 
   useEffect(() => {
     fetchArtists();
-    return libraryEmitter.subscribe(fetchArtists);
-  }, [fetchArtists]);
+  }, [fetchArtists, libraryRevision]);
 
   return artists;
 }
@@ -154,23 +105,17 @@ export function useArtists() {
 export function useAlbums() {
   const db = useSafeDatabase();
   const [albums, setAlbums] = useState<Album[]>([]);
+  const libraryRevision = useLibraryStore(state => state.libraryRevision);
 
   const fetchAlbums = useCallback(async () => {
     if (!db) return;
-    try {
-      const results = await db.getAllAsync<Album>(
-        `SELECT * FROM Albums ORDER BY createdAt DESC`
-      );
-      setAlbums(results);
-    } catch (error) {
-      console.error('Failed to fetch albums:', error);
-    }
-  }, [db]);
+    const results = await getAllAlbums(db);
+    setAlbums(results);
+  }, [db, libraryRevision]);
 
   useEffect(() => {
     fetchAlbums();
-    return libraryEmitter.subscribe(fetchAlbums);
-  }, [fetchAlbums]);
+  }, [fetchAlbums, libraryRevision]);
 
   return albums;
 }
@@ -181,23 +126,17 @@ export function useAlbums() {
 export function useDownloadedSongs() {
   const db = useSafeDatabase();
   const [downloadedSongs, setDownloadedSongs] = useState<ExtractedTrack[]>([]);
+  const libraryRevision = useLibraryStore((state) => state.libraryRevision);
 
   const fetchDownloadedSongs = useCallback(async () => {
     if (!db) return;
-    try {
-      const results = await db.getAllAsync<ExtractedTrack>(
-        `SELECT t.* FROM Tracks t INNER JOIN Downloads d ON t.id = d.trackId ORDER BY d.downloadedAt DESC`
-      );
-      setDownloadedSongs(results);
-    } catch (error) {
-      console.error('Failed to fetch downloaded songs:', error);
-    }
+    const results = await getDownloadedTracks(db);
+    setDownloadedSongs(results);
   }, [db]);
 
   useEffect(() => {
     fetchDownloadedSongs();
-    return libraryEmitter.subscribe(fetchDownloadedSongs);
-  }, [fetchDownloadedSongs]);
+  }, [fetchDownloadedSongs, libraryRevision]);
 
   return downloadedSongs;
 }
@@ -211,34 +150,13 @@ export function useHistory() {
 
   const fetchHistory = useCallback(async () => {
     if (!db) return;
-    try {
-      const results = await db.getAllAsync<{
-        id: string; title: string; artist: string; artworkUrl: string; duration: number; lastPlayedAt: number;
-      }>(
-        `SELECT t.id, t.title, t.artist, t.artworkUrl, t.duration, h.lastPlayedAt
-         FROM PlaybackHistory h
-         JOIN Tracks t ON t.id = h.trackId
-         ORDER BY h.lastPlayedAt DESC
-         LIMIT 100`
-      );
-      
-      const mappedResults: ExtractedTrack[] = results.map(row => ({
-        id: row.id,
-        title: row.title,
-        artist: row.artist,
-        duration: row.duration,
-        artworkUrl: row.artworkUrl
-      }));
-      
-      setHistory(mappedResults);
-    } catch (error) {
-      console.error('Failed to fetch history:', error);
-    }
+    const results = await getFullPlaybackHistory(db, 100);
+    setHistory(results);
   }, [db]);
 
   useEffect(() => {
     fetchHistory();
-    return libraryEmitter.subscribe(fetchHistory);
+    
   }, [fetchHistory]);
 
   return history;

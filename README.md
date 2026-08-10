@@ -1,14 +1,14 @@
-# HyperMusic
+# HyperMusic 2.0
 
-[![React Native](https://img.shields.io/badge/React%20Native-0.85.3-0284c7?style=flat-square&logo=react)](https://reactnative.dev)
-[![Expo](https://img.shields.io/badge/Expo-v56-000020?style=flat-square&logo=expo)](https://expo.dev)
+[![React Native](https://img.shields.io/badge/React%20Native-0.86.0-0284c7?style=flat-square&logo=react)](https://reactnative.dev)
+[![Expo](https://img.shields.io/badge/Expo-v57-000020?style=flat-square&logo=expo)](https://expo.dev)
 [![Nitro Modules](https://img.shields.io/badge/Nitro%20Modules-C%2B%2B%20%7C%20HybridObject-brightgreen?style=flat-square)](https://github.com/mrousavy/react-native-nitro)
 [![Platform](https://img.shields.io/badge/Platform-Android-blue?style=flat-square)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 HyperMusic is an elite, ultra-high-performance music streaming client designed to deliver uncompromising audio playback, high-fidelity user interfaces, and direct zero-overhead streaming resolution exclusively for Android.
 
-Unlike traditional React Native streaming applications that suffer from JavaScript bridge serialization bottlenecks and heavy web-scraping overhead, HyperMusic implements a bespoke native C++ HybridObject extraction engine (`react-native-hyper-extractor`). This allows direct native thread-pool execution for deep InnerTube JSON traversal, real-time taxonomy resolution, and multi-tier audio unboxing.
+Unlike traditional React Native streaming applications that suffer from JavaScript bridge serialization bottlenecks and heavy web-scraping overhead, HyperMusic implements bespoke native C++ HybridObject engines for both extraction and playback. This allows direct native thread-pool execution for deep InnerTube JSON traversal, real-time taxonomy resolution, multi-tier audio unboxing, and gapless media playback—all without a single byte of data ever touching the legacy async bridge.
 
 ---
 
@@ -26,7 +26,7 @@ The fastest way to experience HyperMusic is to download the pre-compiled APK dir
 
 HyperMusic is engineered from the ground up for power-users, prioritizing a purely local-first, premium experience.
 
-- **Background Playback & Lockscreen Controls:** Seamless native background audio persistence powered by a bleeding-edge Alpha build of `react-native-track-player`.
+- **Background Playback & Lockscreen Controls:** Powered by a fully custom native media engine (`react-native-hyper-player`) built on AndroidX Media3 (ExoPlayer), with deep `MediaSessionService` integration for Android 13/14+ foreground services, system notification controls, and hardware media key interception.
 - **Zero-Click Offline Library:** Download your favorite tracks instantly as `.m4a` files for purely offline playback, fully indexed locally using Expo SQLite and MMKV for sub-millisecond retrieval.
 - **Dynamic Real-Time Discovery:** Unlike static apps, the `Home` and `Explore` feeds scrape live InnerTube chip clouds and shelves dynamically, ensuring the catalog is always fresh.
 - **High-Speed Robust Downloading:** Features a bespoke concurrent downloading engine (`hyper-downloader`) bounded by strict Kotlin Semaphores, ensuring parallel bulk downloads never crash or exhaust Android OS resources.
@@ -42,12 +42,19 @@ HyperMusic is powered by a custom internal native module built on top of **React
 - **Bulletproof Fallback Engine:** Features a highly resilient audio stream resolver utilizing NewPipe extraction cores. It dynamically shifts between target high-bitrate quality (`256kbps` / `128kbps`), M4A containers, and fallback audio streams to guarantee uninterrupted playback.
 - **Custom Downloader & Network Layer:** Leverages a specialized OkHttp implementation with localized request headers, automated `visitorData` state persistence, and robust retry interceptors.
 
-### 🌐 2. Dynamic Real-Time Taxonomy Scraping
+### 🎵 2. Native Media Engine (`react-native-hyper-player`)
+A completely custom media playback engine—replacing all third-party player libraries—built with Nitro Modules and AndroidX Media3.
+- **JSI Bridge:** Direct memory-access bindings from TypeScript to a native Singleton ExoPlayer instance. No JSON serialization, no async bridge overhead.
+- **JIT Preloading:** Automatically resolves `hyper://` URIs, extracts stream URLs on a background IO thread, replaces them in the ExoPlayer playlist, and prefills 2MB into a local `SimpleCache` for gapless transitions.
+- **Hot Stream Swapping:** Dynamically switches between audio-only and video streams at the exact millisecond marker without resetting the player queue.
+- **Smart Logging:** Centralized `Logger.kt` utility that automatically silences all debug and info logs in production APKs via `BuildConfig.DEBUG`, preventing URL leakage and saving CPU cycles.
+
+### 🌐 3. Dynamic Real-Time Taxonomy Scraping
 HyperMusic rejects static, fragile fallback mapping tables.
 - **`DynamicChipResolver`:** Dynamically scrapes InnerTube explore landing pages (`FEmusic_moods_and_genres`) and home feed chip clouds (`FEmusic_home`) to unbox real-time `browseIds` and parameter tuples on the fly.
 - **`Parsers` Suite:** An extensive native JSON unboxing engine capable of deeply traversing complex flex-columns, immersive headers, microformats, and section list renderers into strongly typed TypeScript interfaces.
 
-### 🎨 3. High-Fidelity Premium Aesthetics
+### 🎨 4. High-Fidelity Premium Aesthetics
 The presentation layer is crafted with state-of-the-art modern interface standards:
 - **Glassmorphic Surface Hierarchies:** Clean, translucent overlays with rich dark mode color tailoring.
 - **Micro-Animations & Fluid Physics:** Responsive gesture handling, custom player bottom sheets, and seamless layout transitions.
@@ -85,10 +92,15 @@ npm run android
 
 ---
 
-## 🤖 Built with an Agentic Workflow
+## 🛠️ Crafted with Passion & Precision
 
-> **Note on Project Genesis:**
-> This entire codebase—spanning the React Native frontend, the C++ Nitro Module bindings, the resilient OkHttp network layer, and the native Kotlin extraction engine—was architected and engineered via an advanced **Agentic Workflow** in pair-programming collaboration with **Antigravity** (Google DeepMind). It stands as a testament to the power of state-of-the-art AI-assisted software architecture and engineering governance.
+This entire codebase—spanning the custom React Native frontend, the C++ Nitro Module bindings, the resilient OkHttp network layer, and the native Kotlin extraction engine—is the result of relentless hard work, countless iterations, and a deep passion for building an elite music client. We have heavily leveraged modern AI-assisted engineering tools to accelerate our development and push boundaries, but the core architecture, design decisions, and final polish come from dedicated human craftsmanship.
+
+## 🐛 Maintenance & Future Roadmap
+
+HyperMusic 2.0 represents a massive architectural shift and a complete rewrite of our core engines. Because this is an exceptionally large and complex codebase, there is always a chance of encountering hidden bugs or edge-case inconsistencies that we haven't noticed yet. 
+
+If you encounter any issues, please report them! We are fully committed to continuously upgrading, debugging, and polishing this app. Our ultimate goal is to evolve HyperMusic into one of the most robust, advanced, and reliable streaming systems available, and we won't stop until we achieve that perfection.
 
 ---
 

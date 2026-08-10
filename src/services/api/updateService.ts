@@ -17,20 +17,14 @@ export interface UpdateResponse {
 
 /**
  * Service to check for the latest app updates.
- * Simulates a network request by returning data directly from the codebase in an organized way.
+ * Fetches release metadata from the HyperStudio marketplace API.
  */
 export const updateService = {
   async checkForUpdates(): Promise<UpdateResponse> {
     try {
-      // Append timestamp to bypass aggressive React Native fetch caching
-      const timestamp = Date.now();
-      const response = await fetch(`https://hyperstudio-marketplace.vercel.app/api/releases/proj_hypermusic?t=${timestamp}`, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
+      const productId = Constants.expoConfig?.extra?.hyperstudioProductId || 'proj_hypermusic';
+      
+      const response = await fetch(`https://hyperstudio-marketplace.vercel.app/api/releases/${productId}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -61,20 +55,8 @@ export const updateService = {
   /**
    * Helper to check if the latest version is greater than current installed version
    */
-  isUpdateAvailable(latestVersion: string): boolean {
-    const currentVersion = Constants.expoConfig?.version || '1.0.0';
-    
-    // Semantic version comparison
-    const latestParts = latestVersion.split('.').map(Number);
-    const currentParts = currentVersion.split('.').map(Number);
-    
-    const maxLength = Math.max(latestParts.length, currentParts.length);
-    for (let i = 0; i < maxLength; i++) {
-      const l = latestParts[i] || 0;
-      const c = currentParts[i] || 0;
-      if (l > c) return true;
-      if (l < c) return false;
-    }
-    return false; // Versions are exactly equal
+  isUpdateAvailable(versionCode: number): boolean {
+    const currentVersionCode = Constants.expoConfig?.android?.versionCode || 1;
+    return versionCode > currentVersionCode;
   }
 };

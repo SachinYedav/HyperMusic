@@ -1,18 +1,18 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, Text, Linking, TouchableOpacity } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, ExternalLink } from 'lucide-react-native';
+import { ArrowLeft, ExternalLink, FileText, User, Link } from 'lucide-react-native';
 import { Screen } from '@/ui/Screen';
 import { useTheme } from '@/theme/ThemeContext';
-import { spacing } from '@/theme/spacing';
-import { typography } from '@/theme/typography';
+import { spacing, typography, radius } from '@/theme';
 import type { SettingsStackParamList } from '@/navigation/types';
+import { SettingsSection, SettingsActionRow } from '../components/SettingsComponents';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'LicenseDetail'>;
 
 /**
- * Screen presenting exhaustive open source legal texts, copyright statements, and external repository links.
+ * Detail view for a single open-source dependency.
  */
 export function LicenseDetailScreen() {
   const { colors } = useTheme();
@@ -20,17 +20,28 @@ export function LicenseDetailScreen() {
   const route = useRoute<Props['route']>();
   const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList>>();
 
-  const { licenseName, licenseText, repository } = route.params;
+  const { licenseName, licenseVersion, licenseType, licenseText, repository, publisher } = route.params;
 
-  const openRepository = async () => {
+  const typeUpper = (licenseType || '').toUpperCase();
+  const isGpl = typeUpper.includes('GPL') || typeUpper.includes('GNU') || typeUpper.includes('GENERAL PUBLIC LICENSE');
+
+  const openRepository = useCallback(async () => {
     if (repository) {
       try {
         await Linking.openURL(repository);
-      } catch (err) {
-        console.warn('Failed to open repository:', err);
+      } catch {
+        // Silently fail — browser not available
       }
     }
-  };
+  }, [repository]);
+
+  // 
+  const ackBg = isGpl ? colors.warning + '18' : colors.blue + '14';
+  const ackBorder = isGpl ? colors.warning + '44' : colors.blue + '44';
+  const ackIconColor = isGpl ? colors.warning : colors.blue;
+  const ackText = isGpl
+    ? `This software is distributed under the ${licenseType} license. Redistribution of built binaries must satisfy the applicable source and notice obligations.`
+    : `This software is distributed under the ${licenseType} license. We acknowledge and thank the open-source community for their contributions.`;
 
   return (
     <Screen disableSafeAreaBottom>
@@ -38,53 +49,137 @@ export function LicenseDetailScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <ArrowLeft color={colors.text} size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{licenseName}</Text>
+        <Text style={styles.headerTitle}>Details</Text>
         {!!repository && (
-          <TouchableOpacity style={styles.headerRightAction} onPress={openRepository}>
+          <TouchableOpacity style={styles.externalButton} onPress={openRepository}>
             <ExternalLink color={colors.text} size={22} />
           </TouchableOpacity>
         )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.licenseText}>
+        <Text style={styles.packageName}>{licenseName}</Text>
+        <View style={[styles.versionPill, { backgroundColor: colors.blue + '22' }]}>
+          <Text style={[styles.versionLabel, { color: colors.blue }]}>Version {licenseVersion}</Text>
+        </View>
+
+        <View style={styles.metaCard}>
+          <SettingsSection colors={colors}>
+            <SettingsActionRow
+              icon={FileText}
+              label="License Type"
+              valueLabel={licenseType}
+              colors={colors}
+              hideChevron
+            />
+            <SettingsActionRow
+              icon={User}
+              label="Publisher"
+              valueLabel={publisher}
+              colors={colors}
+              hideChevron
+            />
+            {!!repository && (
+              <SettingsActionRow
+                icon={Link}
+                label="Repository"
+                valueLabel="View Source"
+                onPress={openRepository}
+                isLast
+                colors={colors}
+                hideChevron={false}
+              />
+            )}
+          </SettingsSection>
+        </View>
+
+        <View style={[styles.ackBox, { backgroundColor: ackBg, borderColor: ackBorder }]}>
+          <FileText color={ackIconColor} size={20} style={styles.ackIcon} />
+          <Text style={[styles.ackText, { color: colors.text }]}>{ackText}</Text>
+        </View>
+
+        <Text style={[styles.legalSectionTitle, { color: colors.text }]}>Legal Notice</Text>
+        <Text style={[styles.licenseText, { color: colors.textMuted }]}>
           {licenseText}
         </Text>
+
       </ScrollView>
     </Screen>
   );
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    padding: spacing.xs,
-    marginRight: spacing.md,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: typography.title,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  headerRightAction: {
-    padding: spacing.xs,
-    marginLeft: spacing.sm,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: 140,
-  },
-  licenseText: {
-    fontSize: typography.bodySm,
-    fontFamily: 'monospace',
-    lineHeight: 22,
-    color: colors.textMuted,
-  },
-});
+const getStyles = (colors: any) =>
+  StyleSheet.create({
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    backButton: {
+      padding: spacing.xs,
+      marginRight: spacing.md,
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: typography.title,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    externalButton: {
+      padding: spacing.xs,
+    },
+    content: {
+      paddingHorizontal: spacing.lg,
+      paddingBottom: 140,
+    },
+    packageName: {
+      fontSize: typography.header,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    versionPill: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.md,
+      marginBottom: spacing.xl,
+    },
+    versionLabel: {
+      fontSize: typography.captionLg,
+      fontWeight: '600',
+    },
+    metaCard: {
+      marginBottom: spacing.md,
+    },
+    ackBox: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      padding: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      marginBottom: spacing.xl,
+      gap: spacing.md,
+    },
+    ackIcon: {
+      marginTop: 2,
+      flexShrink: 0,
+    },
+    ackText: {
+      flex: 1,
+      fontSize: typography.bodySm,
+      lineHeight: 22,
+    },
+    legalSectionTitle: {
+      fontSize: typography.subtitle,
+      fontWeight: 'bold',
+      marginBottom: spacing.md,
+    },
+    licenseText: {
+      fontSize: typography.bodySm,
+      fontFamily: 'monospace',
+      lineHeight: 22,
+    },
+  });

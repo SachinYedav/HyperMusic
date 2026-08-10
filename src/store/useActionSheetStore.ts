@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type ActionSheetContextType = 'track' | 'playlist' | 'artist' | 'album' | null;
+type ActionSheetContextType = 'track' | 'playlist' | 'artist' | 'album' | 'podcast' | 'podcast_show' | null;
 
 interface ActionSheetOptions {
   isQueueItem?: boolean;

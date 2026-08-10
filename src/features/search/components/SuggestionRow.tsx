@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { Search } from 'lucide-react-native';
-import { useTheme, spacing, typography } from '@/theme';
+import { useTheme, spacing } from '@/theme';
 import { getHighlightedSearchParts } from '../utils/searchHighlight';
 
 export type SuggestionRowProps = {

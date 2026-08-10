@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react';
 import { View, TextInput, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import { Search, X, ArrowLeft } from 'lucide-react-native';
+import { Search, X, ArrowLeft, Mic } from 'lucide-react-native';
 import { useTheme, spacing, radius, typography } from '@/theme';
 
 interface SearchHeaderProps {
@@ -12,6 +12,7 @@ interface SearchHeaderProps {
   onClear: () => void;
   onFocus: () => void;
   onBackPress: () => void;
+  onMicPress?: () => void;
 }
 
 export const SearchHeader = forwardRef<TextInput, SearchHeaderProps>(({
@@ -23,18 +24,18 @@ export const SearchHeader = forwardRef<TextInput, SearchHeaderProps>(({
   onClear,
   onFocus,
   onBackPress,
+  onMicPress,
 }, ref) => {
   const { colors } = useTheme();
 
   return (
     <View style={styles.headerContainer}>
-      {isFocused && (
-        <Pressable hitSlop={12} onPress={onBackPress} style={styles.backButton}>
-          <ArrowLeft color={colors.text} size={24} />
-        </Pressable>
-      )}
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: isFocused ? colors.border : 'transparent' }]}>
-        {!isFocused && (
+        {isFocused ? (
+          <Pressable hitSlop={12} onPress={onBackPress} style={styles.searchIcon}>
+            <ArrowLeft color={colors.text} size={24} />
+          </Pressable>
+        ) : (
           <View style={styles.searchIcon}>
             <Search color={colors.textMuted} size={20} />
           </View>
@@ -57,7 +58,19 @@ export const SearchHeader = forwardRef<TextInput, SearchHeaderProps>(({
           <Pressable accessibilityLabel="Clear search" hitSlop={8} onPress={onClear} style={styles.clearButton}>
             <X color={colors.textMuted} size={18} />
           </Pressable>
-        ) : null}
+        ) : (
+          <Pressable 
+            accessibilityLabel="Voice search" 
+            hitSlop={12} 
+            onPress={() => {
+              if (onMicPress) onMicPress();
+            }} 
+            style={styles.micButton}
+          >
+            <Search color="transparent" size={0} /> 
+            <Mic color={colors.text} size={20} />
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -70,10 +83,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
     gap: spacing.sm,
-  },
-  backButton: {
-    paddingVertical: spacing.xs,
-    paddingRight: spacing.xs,
   },
   searchBar: {
     flex: 1,
@@ -97,6 +106,12 @@ const styles = StyleSheet.create({
   clearButton: {
     width: 28,
     height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micButton: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },

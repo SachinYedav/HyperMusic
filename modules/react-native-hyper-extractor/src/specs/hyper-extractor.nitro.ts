@@ -1,5 +1,10 @@
 import { type HybridObject, NitroModules } from 'react-native-nitro-modules';
 
+export interface ExtractedEntity {
+  id: string;
+  name: string;
+}
+
 /**
  * Represents an unboxed, fully resolved playable track entity.
  */
@@ -8,9 +13,11 @@ export interface ExtractedTrack {
   title: string;
   artist: string;
   artistId?: string;
+  album?: string;
   albumId?: string;
   duration: number;
   artworkUrl: string;
+  artists?: ExtractedEntity[];
 }
 
 /**
@@ -23,7 +30,9 @@ export interface BrowseItem {
   subtitle: string;
   artworkUrl: string;
   artistId?: string;
+  album?: string;
   albumId?: string;
+  artists?: ExtractedEntity[];
 }
 
 /**
@@ -52,6 +61,7 @@ export interface AlbumDetails {
   year: string;
   artworkUrl: string;
   tracks: ExtractedTrack[];
+  artists?: ExtractedEntity[];
 }
 
 /**
@@ -93,7 +103,7 @@ export interface ArtistProfile {
  */
 export interface HyperExtractor extends HybridObject<{ ios: 'swift', android: 'kotlin' }> {
   /** Resolves direct streaming playback URLs for a target videoId and quality profile. */
-  getStreamUrl(videoId: string, quality: string): Promise<string>;
+  getStreamUrl(videoId: string, quality: string, extractionType?: string): Promise<string>;
   
   /** Executes a catalog query to unbox relevant browse items across diverse layout sections. */
   search(query: string): Promise<BrowseItem[]>;

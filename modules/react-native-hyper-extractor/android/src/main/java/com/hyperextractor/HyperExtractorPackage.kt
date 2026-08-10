@@ -19,5 +19,10 @@ public class HyperExtractorPackage : BaseReactPackage() {
     init {
       HyperExtractorOnLoad.initializeNative();
     }
+    
+    // Public entrypoint to safely trigger the companion object initialization from app startup
+    fun initialize() {
+      // Intentionally left blank. Calling this method guarantees the init block above has run.
+    }
   }
 }

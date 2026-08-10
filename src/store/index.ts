@@ -6,3 +6,4 @@ export * from './usePlaylistSelectionStore';
 export * from '../features/settings/store/useSettingsStore';
 export * from './useThemeStore';
 export * from './usePreferencesStore';
+export * from './useToastStore';

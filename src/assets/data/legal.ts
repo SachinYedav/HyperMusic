@@ -9,7 +9,7 @@ export interface LegalDocument {
 
 export const termsData: LegalDocument = {
   title: "Terms of Service",
-  lastUpdated: "July 1, 2026",
+  lastUpdated: "August 9, 2026",
   sections: [
     {
       title: "1. Acceptance of Terms & Age Restriction",
@@ -25,34 +25,48 @@ export const termsData: LegalDocument = {
       ]
     },
     {
-      title: "3. Third-Party Platform Terms & Compliance",
+      title: "3. Disclaimer of Affiliation & Trademarks",
       paragraphs: [
-        "HyperMusic initiates direct client-side network requests to third-party platforms (e.g., YouTube, Google LLC). You acknowledge that the Terms of Service of these third-party platforms may prohibit the extraction, downloading, caching, or bypassing of their normal access interfaces.",
-        "By using HyperMusic, you assume full personal legal responsibility for ensuring your usage complies with the terms and conditions of any third-party services accessed through this software. The developers of HyperMusic do not condone, encourage, or promote the violation of any third-party agreements or the unauthorized downloading of copyrighted material."
+        "HyperMusic is an independent, open-source project. The software is not affiliated, associated, authorized, endorsed by, or in any way officially connected with Google LLC, YouTube, YouTube Music, or any of their subsidiaries or affiliates.",
+        "All product and company names are the registered trademarks of their original owners. The use of any trade name or trademark within this software is strictly for identification and reference purposes only, and does not imply any association with the trademark holder of their product brand."
       ]
     },
     {
-      title: "4. Prohibited Circumvention & Permissible Use",
+      title: "4. Third-Party Platform Terms & Compliance",
       paragraphs: [
-        "You agree not to utilize the software for any commercial distribution, mass automated archiving, unauthorized rebroadcasting, or piracy of copyrighted material. HyperMusic is designed as an alternative UI and must not be used as a tool for Digital Rights Management (DRM) circumvention or mass-scale media piracy."
+        "HyperMusic initiates direct client-side network requests to third-party platforms. You acknowledge that the Terms of Service of these third-party platforms may prohibit the extraction, downloading, caching, or bypassing of their normal access interfaces.",
+        "By using HyperMusic, you assume full personal legal responsibility for ensuring your usage complies with the terms and conditions of any third-party services accessed through this software. The developers of HyperMusic do not condone, encourage, or promote the violation of any third-party agreements."
       ]
     },
     {
-      title: "5. Content Source & Copyright (DMCA) Policy",
+      title: "5. Prohibited Circumvention & Interoperability Research",
+      paragraphs: [
+        "You agree not to utilize the software for any commercial distribution, mass automated archiving, unauthorized rebroadcasting, or piracy of copyrighted material.",
+        "HyperMusic interacts exclusively with unencrypted, publicly accessible web endpoints. It does not circumvent, decrypt, or break Widevine or any other Digital Rights Management (DRM) protocols. The underlying reverse-engineering mechanics and source code are published strictly for interoperability research and educational purposes."
+      ]
+    },
+    {
+      title: "6. Content Source & Copyright (DMCA) Policy",
       paragraphs: [
         "HyperMusic does not host, upload, retransmit, license, or store any proprietary third-party audio or video streams on any proprietary servers. All digital content is retrieved in real-time from external Content Delivery Networks (CDNs).",
-        "If you are a copyright holder and believe your content is being infringed upon, please note that HyperMusic exercises no control over third-party servers. Takedown notices must be directed to the host CDNs (e.g., YouTube). However, to report issues with the HyperMusic client itself, please file an issue on the official GitHub repository."
+        "If you are a copyright holder and believe your content is being infringed upon, please note that HyperMusic exercises no control over third-party servers. Takedown notices must be directed to the host CDNs. To report issues with the HyperMusic client code itself, file an issue on the official GitHub repository."
       ]
     },
     {
-      title: "6. Disclaimer of Warranties & Limitation of Liability",
+      title: "7. Disclaimer of Warranties & Limitation of Liability",
       paragraphs: [
         "THE SOFTWARE IS PROVIDED STRICTLY ON AN \"AS IS\" AND \"AS AVAILABLE\" BASIS, WITHOUT WARRANTIES OF ANY KIND. WE EXPRESSLY DISCLAIM ANY GUARANTEE THAT THE SOFTWARE WILL FUNCTION UNINTERRUPTED, OR THAT THIRD-PARTY ENDPOINTS WILL REMAIN ACCESSIBLE.",
         "IN NO EVENT SHALL THE DEVELOPERS OR CONTRIBUTORS BE HELD LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OR INABILITY TO OPERATE THE SOFTWARE, INCLUDING CLAIMS RELATED TO THIRD-PARTY ACCOUNT TERMINATION."
       ]
     },
     {
-      title: "7. Governing Law & Termination",
+      title: "8. User Indemnification",
+      paragraphs: [
+        "By operating this software, you agree to defend, indemnify, and hold harmless the developers, contributors, and maintainers of HyperMusic from and against any and all claims, damages, obligations, losses, liabilities, costs, or debt, and expenses (including but not limited to attorney's fees) arising from your use of the software, or your violation of any third-party Terms of Service or intellectual property laws."
+      ]
+    },
+    {
+      title: "9. Governing Law & Termination",
       paragraphs: [
         "The developers reserve the right to terminate your license to use the software if you violate these Terms. These Terms are intended to operate to the maximum extent permitted by applicable law; if any provision is found unenforceable, the remaining provisions will continue in effect."
       ]
@@ -62,7 +76,7 @@ export const termsData: LegalDocument = {
 
 export const privacyData: LegalDocument = {
   title: "Privacy Policy",
-  lastUpdated: "July 1, 2026",
+  lastUpdated: "August 9, 2026",
   sections: [
     {
       title: "1. Zero Data Collection Architecture",
@@ -74,8 +88,8 @@ export const privacyData: LegalDocument = {
     {
       title: "2. Localized Storage & SQLite Execution",
       paragraphs: [
-        "All operational configurations, personalized taste preferences, user-generated playlists, playback history logs, and downloaded media files are securely written directly to your local device filesystem utilizing highly optimized SQLite databases and MMKV key-value stores.",
-        "You retain absolute ownership over your local data. You may permanently erase your entire library and operational history at any time directly through the application's configuration menus."
+        "All operational configurations, personalized taste preferences, user-generated playlists, saved artists, playback history logs, and downloaded media files (including batch downloads for albums and playlists) are securely written directly to your local device filesystem utilizing highly optimized SQLite databases and MMKV key-value stores.",
+        "You retain absolute ownership over your local data. You may permanently erase your entire library, offline downloads, and operational history at any time directly through the application's configuration menus."
       ]
     },
     {
@@ -88,8 +102,8 @@ export const privacyData: LegalDocument = {
     {
       title: "4. Device Permissions & Background Services",
       paragraphs: [
-        "HyperMusic requests operating system permissions strictly limited to the absolute technical minimum required for basic media playback functionality.",
-        "• Notification Permission: Required to display media playback controls in your system tray.\n• Foreground Service & Wake Lock: Required by the Android operating system to keep music playing in the background while the screen is off.\n• Local App Storage: Used within the app sandbox to maintain your offline media cache, saved library, playback history, and preferences."
+        "HyperMusic requests operating system permissions strictly limited to the absolute technical minimum required for basic media playback and offline functionality.",
+        "• Notification Permission: Required to display media playback controls and download progress in your system tray.\n• Foreground Service (Media Playback & Data Sync) & Wake Lock: Required by the Android operating system to keep music playing in the background and to ensure batch media downloads continue successfully while the screen is off.\n• Microphone (Audio Recording): Requested strictly for the Native Voice Search (Speech-to-Text) functionality. Audio processing is handled by your device's native speech recognition engine; we do not record, transmit, or store your audio on any remote servers.\n• Local App Storage: Used within the app sandbox to maintain your offline media cache, saved library, playback history, and preferences."
       ]
     },
     {

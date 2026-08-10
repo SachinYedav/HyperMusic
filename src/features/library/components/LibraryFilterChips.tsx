@@ -38,7 +38,7 @@ export const LibraryFilterChips: React.FC<Props> = React.memo(({ selected, onSel
               {
                 backgroundColor: isSelected
                   ? colors.text
-                  : colors.surfaceMuted,
+                  : 'transparent',
                 borderColor: isDark ? colors.border : '#CCC',
               }
             ]}
