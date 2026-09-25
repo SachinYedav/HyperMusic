@@ -34,10 +34,10 @@ export async function getTopPlayedTracks(db: SQLiteDatabase, limit: number = 20)
 }
 
 /**
- * Inserts or increments a track in the PlaybackHistory.
+ * Synchronous version of upsertPlaybackHistory.
  */
-export async function upsertPlaybackHistory(db: SQLiteDatabase, trackId: string, timestamp: number): Promise<void> {
-  await db.runAsync(
+export function upsertPlaybackHistorySync(db: SQLiteDatabase, trackId: string, timestamp: number): void {
+  db.runSync(
     `INSERT INTO PlaybackHistory (trackId, playCount, lastPlayedAt) 
      VALUES (?, 1, ?)
      ON CONFLICT(trackId) DO UPDATE SET 
@@ -48,14 +48,14 @@ export async function upsertPlaybackHistory(db: SQLiteDatabase, trackId: string,
 }
 
 /**
- * Prunes the PlaybackHistory to keep it under the limit.
+ * Synchronous version of prunePlaybackHistory.
  */
-export async function prunePlaybackHistory(db: SQLiteDatabase, limit: number): Promise<void> {
-  const countResult = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM PlaybackHistory`);
+export function prunePlaybackHistorySync(db: SQLiteDatabase, limit: number): void {
+  const countResult = db.getFirstSync<{ count: number }>(`SELECT COUNT(*) as count FROM PlaybackHistory`);
   const totalCount = countResult?.count || 0;
 
   if (totalCount > limit) {
-    await db.runAsync(
+    db.runSync(
       `DELETE FROM PlaybackHistory WHERE trackId IN (
          SELECT trackId FROM PlaybackHistory ORDER BY lastPlayedAt ASC LIMIT ?
        )`,

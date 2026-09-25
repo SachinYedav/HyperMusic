@@ -12,6 +12,9 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.Futures
 import androidx.media3.common.ForwardingPlayer
 import com.hyperplayer.R
+import com.margelo.nitro.hyperplayer.widget.WidgetStateRepository
+import com.margelo.nitro.hyperplayer.widget.WidgetUpdateCoordinator
+import com.margelo.nitro.hyperplayer.widget.WidgetUpdateReason
 
 /**
  * Foreground service bound to the OS for managing playback, lock-screen controls, 
@@ -20,7 +23,11 @@ import com.hyperplayer.R
 class HyperMediaSessionService : MediaSessionService() {
 
     companion object {
+        @Volatile
         private var instance: HyperMediaSessionService? = null
+
+        /** True only while this process has an initialized playback session. */
+        fun hasActiveSession(): Boolean = instance?.mediaSession != null
         
         /**
          * Dynamically updates the notification tray icons for Shuffle and Repeat.
@@ -121,7 +128,19 @@ class HyperMediaSessionService : MediaSessionService() {
             }
         }
         
+        val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
         mediaSession = MediaSession.Builder(this, forwardingPlayer)
+            .setSessionActivity(pendingIntent)
             .setCallback(callback)
             .setCustomLayout(listOf(shuffleButton, repeatButton))
             .build()
@@ -142,6 +161,14 @@ class HyperMediaSessionService : MediaSessionService() {
         mediaSession?.run {
             player.pause()
         }
+        
+        WidgetStateRepository.clear()
+        
+        val resetIntent = android.content.Intent("com.margelo.nitro.hyperplayer.ACTION_RESET_WIDGETS").apply {
+            setPackage(applicationContext.packageName)
+        }
+        sendBroadcast(resetIntent)
+        
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -153,6 +180,7 @@ class HyperMediaSessionService : MediaSessionService() {
             release()
             mediaSession = null
         }
+        
         PlayerControllerSingleton.detachSession()
         super.onDestroy()
     }

@@ -20,8 +20,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { extractorService } from '@/services/api/extractorService';
 import {
-  Play, ListPlus, PlusCircle, Heart, Download,
-  User, Disc, Share2, Trash2, CheckCircle2, Shuffle, UserPlus
+  Heart, UserStar, CheckCircle2, Shuffle, UserPlus,
+  ListStart, ListMusic, FolderPlus, ArrowDownToLine, Disc3,
+  Share2, PlayCircle, BookmarkPlus, BookmarkMinus, UserCheck
 } from 'lucide-react-native';
 
 /**
@@ -395,7 +396,12 @@ export function GlobalActionSheet() {
     useToastStore.getState().showToast({
       message: 'Playlist saved to library',
       type: 'success',
-      action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'LibraryMain' }) }
+      action: {
+        label: 'View', onPress: () => {
+          usePlayerStore.getState().collapsePlayer();
+          navigation.navigate('Library', { screen: 'LibraryMain' });
+        }
+      }
     });
     isClosingRef.current = true;
     bottomSheetRef.current?.close();
@@ -417,7 +423,12 @@ export function GlobalActionSheet() {
     useToastStore.getState().showToast({
       message: 'Album saved to library',
       type: 'success',
-      action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'LibraryMain' }) }
+      action: {
+        label: 'View', onPress: () => {
+          usePlayerStore.getState().collapsePlayer();
+          navigation.navigate('Library', { screen: 'LibraryMain' });
+        }
+      }
     });
     isClosingRef.current = true;
     bottomSheetRef.current?.close();
@@ -457,6 +468,7 @@ export function GlobalActionSheet() {
       bottomSheetRef.current?.close();
       closeSheet();
       setTimeout(() => {
+        usePlayerStore.getState().collapsePlayer();
         navigation.navigate('ArtistProfile', {
           id: artistId,
           artistName: name,
@@ -474,6 +486,7 @@ export function GlobalActionSheet() {
   const handleGoToAlbum = () => {
     if (contextType === 'track' && data) {
       if (data.albumId) {
+        usePlayerStore.getState().collapsePlayer();
         navigation.navigate('AlbumDetails', {
           id: data.albumId,
           albumTitle: data.album,
@@ -496,17 +509,26 @@ export function GlobalActionSheet() {
     } else if (activeDownloadState) {
       if (activeDownloadState.status === 'error') {
         useDownloadStore.getState().removeDownload(data.id);
-        downloadService.startDownload(db, data as any);
         useToastStore.getState().showToast({
           message: 'Retrying download...',
           type: 'info',
-          action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'DownloadsScreen' }) }
+          action: {
+            label: 'View', onPress: () => {
+              usePlayerStore.getState().collapsePlayer();
+              navigation.navigate('Library', { screen: 'DownloadsScreen' });
+            }
+          }
         });
       } else {
         useToastStore.getState().showToast({
           message: 'Download in progress...',
           type: 'info',
-          action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'DownloadsScreen' }) }
+          action: {
+            label: 'View', onPress: () => {
+              usePlayerStore.getState().collapsePlayer();
+              navigation.navigate('Library', { screen: 'DownloadsScreen' });
+            }
+          }
         });
       }
     } else {
@@ -514,7 +536,12 @@ export function GlobalActionSheet() {
       useToastStore.getState().showToast({
         message: 'Downloading...',
         type: 'info',
-        action: { label: 'View', onPress: () => navigation.navigate('Library', { screen: 'DownloadsScreen' }) }
+        action: {
+          label: 'View', onPress: () => {
+            usePlayerStore.getState().collapsePlayer();
+            navigation.navigate('Library', { screen: 'DownloadsScreen' });
+          }
+        }
       });
     }
 
@@ -526,22 +553,19 @@ export function GlobalActionSheet() {
   const renderOptions = () => {
     if (contextType === 'track') {
       const downloadLabel = isTrackDownloaded ? "Downloaded" : activeDownloadState ? (activeDownloadState.status === 'error' ? "Retry Download" : `Downloading ${Math.round(activeDownloadState.progress)}%`) : "Download";
-      const downloadIcon = isTrackDownloaded ? CheckCircle2 : Download;
-      const downloadColor = isTrackDownloaded ? colors.success :
-        activeDownloadState ? (activeDownloadState.status === 'error' ? colors.error : colors.brand) :
-          colors.text;
+      const downloadIcon = isTrackDownloaded ? CheckCircle2 : ArrowDownToLine;
 
       return (
         <>
-          {renderActionRow(Play, "Play Next", handlePlayNext)}
-          {renderActionRow(ListPlus, "Add to Queue", handleAddToQueue)}
-          {renderActionRow(PlusCircle, "Add to Playlist", handleAddToPlaylist)}
-          {renderActionRow(Heart, isTrackLiked ? "Unlike" : "Like", handleToggleLike, processingAction === 'like', false, isTrackLiked ? colors.brand : colors.text, isTrackLiked ? colors.brand : 'none')}
+          {renderActionRow(ListStart, "Play Next", handlePlayNext)}
+          {renderActionRow(ListMusic, "Add to Queue", handleAddToQueue)}
+          {renderActionRow(FolderPlus, "Add to Playlist", handleAddToPlaylist)}
+          {renderActionRow(Heart, isTrackLiked ? "Unlike" : "Like", handleToggleLike, processingAction === 'like')}
 
-          {renderActionRow(downloadIcon, downloadLabel, handleDownload, !!(activeDownloadState && activeDownloadState.status !== 'error'), false, downloadColor)}
+          {renderActionRow(downloadIcon, downloadLabel, handleDownload, !!(activeDownloadState && activeDownloadState.status !== 'error'))}
 
-          {renderActionRow(User, "Go to Artist", handleGoToArtist)}
-          {renderActionRow(Disc, "Go to Album", handleGoToAlbum)}
+          {renderActionRow(UserStar, "Go to Artist", handleGoToArtist)}
+          {renderActionRow(Disc3, "Go to Album", handleGoToAlbum)}
           {renderActionRow(Share2, "Share", handleShare)}
         </>
       );
@@ -549,15 +573,15 @@ export function GlobalActionSheet() {
       const isLocal = !!data?.isLocal || isPlaylistSaved;
       return (
         <>
-          {renderActionRow(Play, "Play All", () => handlePlayList('playlist', data.id, data.tracks))}
+          {renderActionRow(PlayCircle, "Play All", () => handlePlayList('playlist', data.id, data.tracks))}
           {renderActionRow(Shuffle, "Shuffle Play", () => handleShuffleList('playlist', data.id, data.tracks))}
-          {renderActionRow(ListPlus, "Play Next", () => handlePlayNextList('playlist', data.id, data.tracks))}
-          {renderActionRow(ListPlus, "Add to Queue", () => handleAddListToQueue('playlist', data.id, data.tracks))}
-          {renderActionRow(Download, "Download Offline", () => handleDownloadList(contextType as any, data.id, data.tracks))}
+          {renderActionRow(ListStart, "Play Next", () => handlePlayNextList('playlist', data.id, data.tracks))}
+          {renderActionRow(ListMusic, "Add to Queue", () => handleAddListToQueue('playlist', data.id, data.tracks))}
+          {renderActionRow(ArrowDownToLine, "Download Offline", () => handleDownloadList(contextType as any, data.id, data.tracks))}
           {renderActionRow(Share2, "Share", handleShare)}
           {isLocal
-            ? renderActionRow(Trash2, "Remove Playlist", handleDeletePlaylist, processingAction === 'deletePlaylist')
-            : renderActionRow(PlusCircle, "Save Playlist", handleSavePlaylist, processingAction === 'savePlaylist')
+            ? renderActionRow(BookmarkMinus, "Remove Playlist", handleDeletePlaylist, processingAction === 'deletePlaylist')
+            : renderActionRow(BookmarkPlus, "Save Playlist", handleSavePlaylist, processingAction === 'savePlaylist')
           }
         </>
       );
@@ -565,46 +589,43 @@ export function GlobalActionSheet() {
       const isLocal = !!data?.isLocal || isAlbumSaved;
       return (
         <>
-          {renderActionRow(Play, "Play Album", () => handlePlayList('album', data.id, data.tracks))}
+          {renderActionRow(PlayCircle, "Play Album", () => handlePlayList('album', data.id, data.tracks))}
           {renderActionRow(Shuffle, "Shuffle Play", () => handleShuffleList('album', data.id, data.tracks))}
-          {renderActionRow(ListPlus, "Play Next", () => handlePlayNextList('album', data.id, data.tracks))}
-          {renderActionRow(ListPlus, "Add to Queue", () => handleAddListToQueue('album', data.id, data.tracks))}
-          {renderActionRow(Download, "Download Offline", () => handleDownloadList(contextType as any, data.id, data.tracks))}
-          {renderActionRow(User, "View Artist", handleGoToArtist)}
+          {renderActionRow(ListStart, "Play Next", () => handlePlayNextList('album', data.id, data.tracks))}
+          {renderActionRow(ListMusic, "Add to Queue", () => handleAddListToQueue('album', data.id, data.tracks))}
+          {renderActionRow(ArrowDownToLine, "Download Offline", () => handleDownloadList(contextType as any, data.id, data.tracks))}
+          {renderActionRow(UserStar, "View Artist", handleGoToArtist)}
           {renderActionRow(Share2, "Share", handleShare)}
           {isLocal
-            ? renderActionRow(Trash2, "Remove Album", handleDeleteAlbum, processingAction === 'deleteAlbum')
-            : renderActionRow(PlusCircle, "Save Album", handleSaveAlbum, processingAction === 'saveAlbum')
+            ? renderActionRow(BookmarkMinus, "Remove Album", handleDeleteAlbum, processingAction === 'deleteAlbum')
+            : renderActionRow(BookmarkPlus, "Save Album", handleSaveAlbum, processingAction === 'saveAlbum')
           }
         </>
       );
     } else if (contextType === 'artist') {
       return (
         <>
-          {renderActionRow(User, "View Profile", handleGoToArtist)}
-          {renderActionRow(UserPlus, isArtistSaved ? "Unfollow Artist" : "Follow Artist", handleToggleArtistSaved, processingAction === 'saveArtist')}
+          {renderActionRow(UserStar, "View Profile", handleGoToArtist)}
+          {renderActionRow(isArtistSaved ? UserCheck : UserPlus, isArtistSaved ? "Unfollow Artist" : "Follow Artist", handleToggleArtistSaved, processingAction === 'saveArtist')}
           {renderActionRow(Share2, "Share", handleShare)}
         </>
       );
     } else if (contextType === 'podcast') {
       const downloadLabel = isTrackDownloaded ? "Downloaded" : activeDownloadState ? (activeDownloadState.status === 'error' ? "Retry Download" : `Downloading ${Math.round(activeDownloadState.progress)}%`) : "Download";
-      const downloadIcon = isTrackDownloaded ? CheckCircle2 : Download;
-      const downloadColor = isTrackDownloaded ? colors.success :
-        activeDownloadState ? (activeDownloadState.status === 'error' ? colors.error : colors.brand) :
-          colors.text;
+      const downloadIcon = isTrackDownloaded ? CheckCircle2 : ArrowDownToLine;
 
       return (
         <>
-          {renderActionRow(Play, "Play Next", handlePlayNext)}
-          {renderActionRow(ListPlus, "Add to Queue", handleAddToQueue)}
-          {renderActionRow(downloadIcon, downloadLabel, handleDownload, !!(activeDownloadState && activeDownloadState.status !== 'error'), false, downloadColor)}
+          {renderActionRow(ListStart, "Play Next", handlePlayNext)}
+          {renderActionRow(ListMusic, "Add to Queue", handleAddToQueue)}
+          {renderActionRow(downloadIcon, downloadLabel, handleDownload, !!(activeDownloadState && activeDownloadState.status !== 'error'))}
           {renderActionRow(Share2, "Share", handleShare)}
         </>
       );
     } else if (contextType === 'podcast_show') {
       return (
         <>
-          {renderActionRow(Play, "Play Latest", () => handlePlayList('podcast', data.id, data.episodes))}
+          {renderActionRow(PlayCircle, "Play Latest", () => handlePlayList('podcast', data.id, data.episodes))}
           {renderActionRow(Share2, "Share", handleShare)}
         </>
       );

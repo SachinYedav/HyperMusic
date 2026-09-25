@@ -18,6 +18,33 @@ export async function getDownloadedTracks(db: SQLiteDatabase): Promise<any[]> {
 }
 
 /**
+ * Fetches queue row IDs for a specific track.
+ */
+export async function getQueueRowsByTrackId(db: SQLiteDatabase, trackId: string): Promise<{ id: string }[]> {
+  try {
+    return await db.getAllAsync<{ id: string }>(`SELECT id FROM DownloadQueue WHERE trackId = ?`, [trackId]);
+  } catch (error) {
+    console.error('[downloadQueries] Error fetching queue rows by track id:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches a single pending queue item joined with its Track entity.
+ */
+export async function getPendingQueueItemWithTrack(db: SQLiteDatabase, trackId: string): Promise<{ trackId: string; trackType: string; queueId: string } | null> {
+  try {
+    return await db.getFirstAsync<{ trackId: string; trackType: string; queueId: string }>(
+      `SELECT t.*, q.id as queueId FROM DownloadQueue q JOIN Tracks t ON q.trackId = t.id WHERE q.trackId = ?`, 
+      [trackId]
+    );
+  } catch (error) {
+    console.error('[downloadQueries] Error fetching pending queue item:', error);
+    return null;
+  }
+}
+
+/**
  * Fetches the next pending tracks from the DownloadQueue.
  */
 export async function getNextPendingDownloads(db: SQLiteDatabase, limit: number = 2): Promise<any[]> {

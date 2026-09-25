@@ -1,88 +1,71 @@
-import React, { useState, useCallback, memo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated as RNAnimated } from 'react-native';
+import React, { useCallback, memo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme, typography, spacing, radius } from '@/theme';
-import { useToastStore } from '@/store/useToastStore';
 import { Screen } from '@/ui/Screen';
 import { useSafeDatabase } from '@/database/useSafeDatabase';
 import { useDownloadStore } from '../store/useDownloadStore';
 import { PremiumImage } from '@/ui/PremiumImage';
 import { useShallow } from 'zustand/react/shallow';
-import { useDownloadedSongs } from '@/features/library/hooks/useLibrary';
 import { downloadService } from '../services/downloadService';
-import { ArrowLeft, DownloadCloud, MoreVertical, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ArrowDownToLine, Play, Pause, X, RefreshCw } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { usePlayerStore } from '@/store';
-import { AppConfirmSheet } from '@/ui/AppConfirmSheet';
-import { useActionSheetStore } from '@/store/useActionSheetStore';
-import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { RectButton } from 'react-native-gesture-handler';
 import { FlashList } from '@shopify/flash-list';
-import { ActiveDownloadsSheet } from '../components/ActiveDownloadsSheet';
-import { formatBytes } from '@/utils/formatters';
-import { AnimatedEQ } from '@/ui/AnimatedEQ';
-import { WaveLoader } from '@/ui/WaveLoader';
+import { pauseBatchNative, resumeBatchNative, cancelBatchNative } from '../../../../modules/hyper-downloader/src';
 
 
 
-const CompletedDownloadRow = memo(({ item, index, colors, isPlaying, onPlay, onDelete, onMorePress }: { item: any, index: number, colors: any, isPlaying: boolean, onPlay: (item: any, index: number) => void, onDelete: (id: string) => void, onMorePress: (item: any) => void }) => {
-  const swipeableRef = useRef<Swipeable>(null);
+const ActiveDownloadRow = memo(({ item, colors, db, onCancel }: { item: any, colors: any, db: any, onCancel: (item: any) => void }) => {
+  const isError = item.status === 'error';
+  const isPaused = item.status === 'paused';
+  const isQueued = item.status === 'queued';
 
-  const renderRightActions = (progress: RNAnimated.AnimatedInterpolation<number>, dragX: RNAnimated.AnimatedInterpolation<number>) => {
-    const trans = dragX.interpolate({
-      inputRange: [-80, 0],
-      outputRange: [1, 0],
-      extrapolate: 'clamp',
-    });
-    const bgOpacity = progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 0.3],
-    });
-    return (
-      <View style={{ width: 80, height: '100%' }}>
-        <RNAnimated.View style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 2000, backgroundColor: colors.error, opacity: bgOpacity }} />
-        <RNAnimated.View style={{ height: '100%', opacity: progress }}>
-          <RectButton style={[styles.deleteAction, { backgroundColor: colors.error, height: '100%' }]} onPress={() => { swipeableRef.current?.close(); onDelete(item.id); }}>
-            <RNAnimated.View style={[styles.deleteActionContent, { transform: [{ scale: trans }] }]}>
-              <Trash2 color={colors.text} size={24} />
-            </RNAnimated.View>
-          </RectButton>
-        </RNAnimated.View>
-      </View>
-    );
+  const handleAction = () => {
+    if (!db) return;
+    if (isError) {
+      useDownloadStore.getState().removeDownload(item.trackId);
+      downloadService.startDownload(db, item.track);
+    } else if (isPaused) {
+      downloadService.resumeDownload(db, item.trackId);
+    } else {
+      downloadService.pauseDownload(db, item.trackId);
+    }
   };
 
   return (
-    <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} rightThreshold={40} overshootRight={false}>
-      <TouchableOpacity style={styles.itemContainer} onPress={() => onPlay(item, index)} activeOpacity={0.7}>
-        {isPlaying ? (
-          <View style={{ width: 24, alignItems: 'center', marginRight: spacing.sm }}>
-            <AnimatedEQ />
+    <View style={[styles.itemContainer, { borderBottomColor: colors.border }]}>
+      <PremiumImage source={item.track.artworkUrl} contextType="track" style={[styles.artwork, { backgroundColor: colors.highlightSubtle }]} fallbackIconSize={20} />
+      <View style={styles.info}>
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{item.track.title}</Text>
+        <Text style={[styles.artist, { color: colors.textMuted }]} numberOfLines={1}>{item.track.artist}</Text>
+
+        {!isError && (
+          <View style={[styles.progressTrack, { backgroundColor: colors.highlightStrong }]}>
+            <View style={[styles.progressBar, { width: `${item.progress}%`, backgroundColor: colors.brand }]} />
           </View>
-        ) : (
-          <Text style={[styles.serialText, { color: colors.textMuted }]}>{index + 1}</Text>
         )}
-        <PremiumImage source={item.localArtworkPath ? { uri: item.localArtworkPath } : item.artworkUrl} contextType="track" style={styles.artwork} fallbackIconSize={20} />
-        <View style={styles.info}>
-          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
-          <Text style={[styles.artist, { color: colors.textMuted }]} numberOfLines={1}>
-            {item.artist}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs }}>
-            <DownloadCloud color={colors.success} size={14} />
-            <Text style={[styles.downloadedText, { color: colors.success }]}>
-              {' Downloaded'}
-              {item.size ? ` • ${formatBytes(item.size)}` : ''}
-            </Text>
-          </View>
-        </View>
-        <TouchableOpacity style={styles.actionBtn} hitSlop={10} onPress={() => onMorePress(item)}>
-          <MoreVertical color={colors.text} size={20} />
+        <Text style={[styles.progressText, { color: isError ? colors.brand : colors.textMuted }]}>
+          {isPaused ? 'Paused' : isError ? 'Download Failed' : isQueued ? 'Waiting in Queue...' : `${Math.round(item.progress)}% Downloading...`}
+        </Text>
+      </View>
+      <View style={styles.actions}>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleAction}>
+          {isError ? (
+            <RefreshCw color={colors.brand} size={24} />
+          ) : isPaused ? (
+            <Play color={colors.text} size={24} />
+          ) : (
+            <Pause color={colors.text} size={24} />
+          )}
         </TouchableOpacity>
-      </TouchableOpacity>
-    </Swipeable>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
+          <X color={colors.textMuted} size={24} />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
-});
+}, (prev, next) => prev.item.status === next.item.status && prev.item.progress === next.item.progress);
+
 
 /**
  * Active download queue and offline local cache management screen providing granular pause, resume, and file deletion controls.
@@ -91,57 +74,54 @@ export function DownloadsScreen() {
   const { colors, isDark } = useTheme();
   const db = useSafeDatabase();
   const navigation = useNavigation();
-  const playList = usePlayerStore(state => state.playList);
-  const activeTrack = usePlayerStore(state => state.activeTrack);
-  const { openSheet } = useActionSheetStore();
 
   const activeDownloads = useDownloadStore(useShallow(state => Object.values(state.activeDownloads)));
   const pendingQueue = useDownloadStore(useShallow(state => state.pendingQueue));
-  const completedDownloads = useDownloadedSongs();
 
-  const totalActive = activeDownloads.length + pendingQueue.length;
+  const activeIds = new Set(activeDownloads.map(a => a.trackId));
+  const waitingTracks = pendingQueue.filter(p => !activeIds.has(p.trackId)).map(p => ({
+    trackId: p.trackId,
+    track: p,
+    progress: 0,
+    status: p.status === 'PAUSED' ? 'paused' : 'queued',
+    isWaiting: true
+  }));
 
-  const [sheetVisible, setSheetVisible] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const combinedQueue = [...activeDownloads, ...waitingTracks];
+  const totalActive = combinedQueue.length;
 
-  React.useEffect(() => {
-    // Grace period for local SQLite extraction to prevent empty state flash
-    const timer = setTimeout(() => setIsLoading(false), 250);
-    return () => clearTimeout(timer);
-  }, [completedDownloads]);
-
-  const handlePlay = useCallback((track: any, index: number) => {
-    const queue = completedDownloads.map((item: any) => ({
-      ...item,
-      artworkUrl: item.localArtworkPath || item.artworkUrl,
-      artwork: item.localArtworkPath || item.artworkUrl,
-      url: item.localFilePath,
-      trackType: item.trackType || 'song',
-    }));
-    playList(queue as any[], index);
-  }, [completedDownloads, playList]);
-
-  const handleDelete = useCallback((trackId: string) => {
-    setTaskToDelete(trackId);
+  const handleCancelAll = useCallback(() => {
+    useDownloadStore.getState().clearActiveDownloads();
+    useDownloadStore.getState().setPendingQueue([]);
+    cancelBatchNative();
   }, []);
 
-  const handleMorePress = useCallback((track: any) => {
-    openSheet('track', track);
-  }, [openSheet]);
+  const handlePauseAll = useCallback(() => {
+    pauseBatchNative();
+  }, []);
 
-  const confirmDelete = async () => {
-    if (taskToDelete) {
-      if (!db) return;
-      try {
-        await downloadService.deleteDownload(db, taskToDelete);
-        useToastStore.getState().showToast('Download removed', 'info');
-      } catch (e) {
-        useToastStore.getState().showToast('Failed to delete the download', 'error');
+  const handleResumeAll = useCallback(() => {
+    resumeBatchNative();
+  }, []);
+
+  const hasPaused = combinedQueue.some(item => item.status?.toLowerCase() === 'paused');
+
+  const handleCancel = useCallback(async (item: any) => {
+    if (item.isWaiting) {
+      const state = useDownloadStore.getState();
+      state.setPendingQueue(state.pendingQueue.filter(p => p.trackId !== item.trackId));
+      if (db) {
+        try {
+          const { deleteDownloadQueueItem } = require('@/database/queries/downloadQueries');
+          await deleteDownloadQueueItem(db, item.trackId);
+        } catch (e) { }
+      }
+    } else {
+      if (db) {
+        downloadService.cancelDownload(db, item.trackId);
       }
     }
-    setTaskToDelete(null);
-  };
+  }, [db]);
 
   return (
     <Screen disableSafeAreaBottom>
@@ -157,65 +137,55 @@ export function DownloadsScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <ArrowLeft color={colors.text} size={24} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Downloads</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Active Downloads</Text>
         </View>
-        <TouchableOpacity style={styles.transfersBtn} onPress={() => setSheetVisible(true)}>
-          <DownloadCloud color={colors.text} size={24} />
-          {totalActive > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.brand }]}>
-              <Text style={styles.badgeText}>{totalActive}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {totalActive > 0 && (
+          <View style={[styles.badge, { backgroundColor: colors.brand }]}>
+            <Text style={styles.badgeText}>{totalActive}</Text>
+          </View>
+        )}
       </View>
+
+      {totalActive > 0 && (
+        <View style={styles.macroControls}>
+          {hasPaused ? (
+            <TouchableOpacity style={[styles.macroBtn, { backgroundColor: colors.surface }]} onPress={handleResumeAll}>
+              <Play color={colors.text} size={20} />
+              <Text style={[styles.macroText, { color: colors.text }]}>Resume All</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.macroBtn, { backgroundColor: colors.surface }]} onPress={handlePauseAll}>
+              <Pause color={colors.text} size={20} />
+              <Text style={[styles.macroText, { color: colors.text }]}>Pause All</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.macroBtn, { backgroundColor: colors.surface }]} onPress={handleCancelAll}>
+            <X color={colors.brand} size={20} />
+            <Text style={[styles.macroText, { color: colors.brand }]}>Cancel All</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={{ flex: 1 }}>
         <FlashList
-          data={completedDownloads}
-          keyExtractor={(item) => `completed_${item.id}`}
+          data={combinedQueue}
+          keyExtractor={(item) => (item as any).isWaiting ? `waiting_${item.trackId}` : `active_${item.trackId}`}
           contentContainerStyle={{ padding: spacing.md, paddingBottom: 170 }}
           showsVerticalScrollIndicator={false}
           //@ts-ignore
           estimatedItemSize={70}
           ListEmptyComponent={
-            isLoading ? (
-              <View style={styles.emptyContainer}>
-                <WaveLoader />
-              </View>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <DownloadCloud color={colors.textMuted} size={48} />
-                <Text style={[styles.emptyText, { color: colors.text }]}>No Downloads Yet</Text>
-                <Text style={[styles.emptySub, { color: colors.textMuted }]}>Music you download will appear here for offline listening.</Text>
-              </View>
-            )
+            <View style={styles.emptyContainer}>
+              <ArrowDownToLine color={colors.textMuted} size={48} />
+              <Text style={[styles.emptyText, { color: colors.text }]}>No Active Downloads</Text>
+              <Text style={[styles.emptySub, { color: colors.textMuted }]}>Ongoing and pending downloads will appear here.</Text>
+            </View>
           }
-          renderItem={({ item, index }) => (
-            <CompletedDownloadRow
-              item={item}
-              index={index}
-              colors={colors}
-              isPlaying={activeTrack?.id === item.id}
-              onPlay={handlePlay}
-              onDelete={handleDelete}
-              onMorePress={handleMorePress}
-            />
+          renderItem={({ item }) => (
+            <ActiveDownloadRow item={item} colors={colors} db={db} onCancel={handleCancel} />
           )}
         />
       </View>
-
-      <ActiveDownloadsSheet visible={sheetVisible} onClose={() => setSheetVisible(false)} />
-
-      <AppConfirmSheet
-        visible={!!taskToDelete}
-        title="Delete Download"
-        message="Are you sure you want to delete this downloaded track from your device?"
-        cancelText="Cancel"
-        confirmText="Confirm"
-        isDestructive
-        onCancel={() => setTaskToDelete(null)}
-        onConfirm={confirmDelete}
-      />
     </Screen>
   );
 }
@@ -231,6 +201,24 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  macroControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  macroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    gap: 6,
+  },
+  macroText: {
+    fontSize: typography.body,
+    fontWeight: '600',
   },
   transfersBtn: {
     padding: spacing.sm,
@@ -264,7 +252,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(150,150,150,0.2)',
+    borderBottomColor: 'transparent',
   },
   serialText: {
     fontSize: typography.body,
@@ -277,7 +265,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: radius.xs,
-    backgroundColor: 'rgba(150,150,150,0.2)',
   },
   info: {
     flex: 1,
@@ -294,7 +281,6 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 4,
-    backgroundColor: 'rgba(150,150,150,0.2)',
     borderRadius: 2,
     marginTop: 6,
     overflow: 'hidden',

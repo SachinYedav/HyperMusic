@@ -1,4 +1,4 @@
-# HyperMusic 2.0
+# HyperMusic 2.1.0
 
 [![React Native](https://img.shields.io/badge/React%20Native-0.86.0-0284c7?style=flat-square&logo=react)](https://reactnative.dev)
 [![Expo](https://img.shields.io/badge/Expo-v57-000020?style=flat-square&logo=expo)](https://expo.dev)
@@ -6,7 +6,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android-blue?style=flat-square)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-HyperMusic is an elite, ultra-high-performance music streaming client designed to deliver uncompromising audio playback, high-fidelity user interfaces, and direct zero-overhead streaming resolution exclusively for Android.
+HyperMusic is a high-performance music streaming client designed to deliver uncompromising audio playback, high-fidelity user interfaces, and direct zero-overhead streaming resolution exclusively for Android.
 
 Unlike traditional React Native streaming applications that suffer from JavaScript bridge serialization bottlenecks and heavy web-scraping overhead, HyperMusic implements bespoke native C++ HybridObject engines for both extraction and playback. This allows direct native thread-pool execution for deep InnerTube JSON traversal, real-time taxonomy resolution, multi-tier audio unboxing, and gapless media playback—all without a single byte of data ever touching the legacy async bridge.
 
@@ -14,19 +14,27 @@ Unlike traditional React Native streaming applications that suffer from JavaScri
 
 ## 📥 Download & Quick Start
 
-The fastest way to experience HyperMusic is to download the pre-compiled APK directly.
+> The easiest and fastest way to get HyperMusic on your Android device.
 
-1. Go to the [Releases](../../releases/latest) page.
-2. Download the **Universal APK** (`app-universal-release-signed.apk`) which works on all Android devices.
-   *(Optional: You can also download architecture-specific splits like `arm64-v8a` if you know your device's architecture and want a smaller app size).*
-3. Install the APK on your Android device and enjoy zero-overhead streaming!
+### 🌐 HyperStudio Marketplace *(Recommended)*
 
+The official HyperStudio website provides a guided download experience for all APK variants:
+
+[![Download on HyperStudio](https://img.shields.io/badge/HyperStudio-Download%20HyperMusic-111318?style=for-the-badge&logo=android&logoColor=white)](https://hyperstudio-marketplace.vercel.app/product/hyper-music)
+
+### 📦 GitHub Releases *(Direct APK)*
+
+Prefer sideloading directly from GitHub? Grab the latest release from the releases page:
+
+[![Latest Release](https://img.shields.io/github/v/release/SachinYedav/HyperMusic?style=for-the-badge&label=Latest%20Release&color=238636)](../../releases/latest)
 ---
 ## 📱 Key Features
 
 HyperMusic is engineered from the ground up for power-users, prioritizing a purely local-first, premium experience.
 
 - **Background Playback & Lockscreen Controls:** Powered by a fully custom native media engine (`react-native-hyper-player`) built on AndroidX Media3 (ExoPlayer), with deep `MediaSessionService` integration for Android 13/14+ foreground services, system notification controls, and hardware media key interception.
+- **Native Home Screen Widgets:** A fully native `WidgetUpdateCoordinator` system driving 5 distinct Android 12+ home screen widgets (Classic, Pill, Material You, Blurred Immersive, Search) with dynamic `androidx.palette` wallpaper color extraction, processed via off-main-thread Kotlin coroutines.
+- **Event-Driven History Tracking:** Core playback tracking is handled natively via `NativeHistoryTracker`, syncing segments directly to SQLite to guarantee exact history recording even under strict OS background suspension.
 - **Zero-Click Offline Library:** Download your favorite tracks instantly as `.m4a` files for purely offline playback, fully indexed locally using Expo SQLite and MMKV for sub-millisecond retrieval.
 - **Dynamic Real-Time Discovery:** Unlike static apps, the `Home` and `Explore` feeds scrape live InnerTube chip clouds and shelves dynamically, ensuring the catalog is always fresh.
 - **High-Speed Robust Downloading:** Features a bespoke concurrent downloading engine (`hyper-downloader`) bounded by strict Kotlin Semaphores, ensuring parallel bulk downloads never crash or exhaust Android OS resources.

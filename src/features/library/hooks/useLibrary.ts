@@ -3,13 +3,13 @@ import { useSafeDatabase } from '@/database/useSafeDatabase';
 import { useLibraryStore } from '@/store/useLibraryStore';
 
 import { ExtractedTrack } from 'react-native-hyper-extractor';
-import { 
-  getLikedTracks, 
-  getAllPlaylists, 
-  getAllAlbums, 
-  getDownloadedTracks, 
+import {
+  getLikedTracks,
+  getDownloadedTracks,
   getFullPlaybackHistory,
-  getSavedArtists 
+  getSavedArtists,
+  getAllPlaylistsWithTrackCount,
+  getAllAlbumsWithTrackCount
 } from '@/database/queries';
 
 export interface Playlist {
@@ -17,6 +17,8 @@ export interface Playlist {
   name: string;
   coverUrl: string | null;
   createdAt: number;
+  updatedAt?: number;
+  trackCount?: number;
 }
 
 export interface Album {
@@ -26,6 +28,8 @@ export interface Album {
   coverUrl: string | null;
   year: string | null;
   createdAt: number;
+  updatedAt?: number;
+  trackCount?: number;
 }
 
 export interface ArtistSummary {
@@ -57,6 +61,7 @@ export function useLikedSongs() {
   return songs;
 }
 
+
 /**
  * Hook to reactively fetch user-created playlists.
  */
@@ -67,7 +72,7 @@ export function usePlaylists() {
 
   const fetchPlaylists = useCallback(async () => {
     if (!db) return;
-    const results = await getAllPlaylists(db);
+    const results = await getAllPlaylistsWithTrackCount(db);
     setPlaylists(results);
   }, [db, libraryRevision]);
 
@@ -109,7 +114,7 @@ export function useAlbums() {
 
   const fetchAlbums = useCallback(async () => {
     if (!db) return;
-    const results = await getAllAlbums(db);
+    const results = await getAllAlbumsWithTrackCount(db);
     setAlbums(results);
   }, [db, libraryRevision]);
 
@@ -132,7 +137,7 @@ export function useDownloadedSongs() {
     if (!db) return;
     const results = await getDownloadedTracks(db);
     setDownloadedSongs(results);
-  }, [db]);
+  }, [db, libraryRevision]);
 
   useEffect(() => {
     fetchDownloadedSongs();
@@ -148,15 +153,16 @@ export function useHistory() {
   const db = useSafeDatabase();
   const [history, setHistory] = useState<ExtractedTrack[]>([]);
 
+  const libraryRevision = useLibraryStore(state => state.libraryRevision);
+
   const fetchHistory = useCallback(async () => {
     if (!db) return;
-    const results = await getFullPlaybackHistory(db, 100);
+    const results = await getFullPlaybackHistory(db, 500);
     setHistory(results);
-  }, [db]);
+  }, [db, libraryRevision]);
 
   useEffect(() => {
     fetchHistory();
-    
   }, [fetchHistory]);
 
   return history;

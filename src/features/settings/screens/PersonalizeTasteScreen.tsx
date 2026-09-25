@@ -260,22 +260,19 @@ export function PersonalizeTasteScreen() {
   return (
     <Screen disableSafeAreaBottom>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={handleCancel}>
-          <ArrowLeft color={colors.text} size={24} />
+        <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
+          <ArrowLeft color={colors.text} size={28} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Personalize Taste</Text>
-        <TouchableOpacity style={[styles.headerSaveBtn, { backgroundColor: colors.brand }]} onPress={handleSave}>
+        <TouchableOpacity style={[styles.headerRight, { backgroundColor: colors.brand }]} onPress={handleSave}>
           <Text style={styles.headerSaveText}>Save</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.introContainer}>
-          <Text style={[styles.introTitle, { color: colors.text }]}>Update Recommendations</Text>
-          <Text style={[styles.introSubtitle, { color: colors.textMuted }]}>
-            Adjust your active languages and genres to dynamically shape your home feed and explore shelves.
-          </Text>
-        </View>
+        <Text style={[styles.infoText, { color: colors.textMuted }]}>
+          Select languages and genres to personalize your home feed recommendations.
+        </Text>
 
         <ExpandableSection
           title="Languages & Industry"
@@ -316,18 +313,19 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  backBtn: {
+  backButton: {
     padding: spacing.xs,
+    marginRight: spacing.md,
   },
   headerTitle: {
+    flex: 1,
     fontSize: typography.title,
     fontWeight: 'bold',
   },
-  headerSaveBtn: {
+  headerRight: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
@@ -343,20 +341,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
   },
-  introContainer: {
-    alignItems: 'center',
+  infoText: {
+    fontSize: typography.body,
     marginBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
-  },
-  introTitle: {
-    fontSize: typography.header,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  introSubtitle: {
-    fontSize: typography.bodySm,
-    textAlign: 'center',
     lineHeight: 20,
   },
   card: {

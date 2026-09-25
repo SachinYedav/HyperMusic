@@ -97,7 +97,10 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
           retryCount INTEGER DEFAULT 0,
           addedAt INTEGER NOT NULL,
           FOREIGN KEY (trackId) REFERENCES Tracks (id) ON DELETE CASCADE
-        )`
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_downloads_date ON Downloads(downloadedAt DESC)`,
+        `CREATE INDEX IF NOT EXISTS idx_playlist_tracks_track ON PlaylistTracks(trackId)`,
+        `CREATE INDEX IF NOT EXISTS idx_album_tracks_track ON AlbumTracks(trackId)`
       ];
 
       // Executing one by one to avoid large execAsync block which sometimes fails on fast-refresh JNI layer
@@ -114,6 +117,21 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
       }
       
       currentVersion = 1;
+    }
+
+    // V2 Migration: Add updatedAt columns to Playlists and Albums
+    if (currentVersion === 1) {
+      try {
+        await db.runAsync(`ALTER TABLE Playlists ADD COLUMN updatedAt INTEGER`);
+      } catch (e) {
+        // Ignored if column already exists
+      }
+      try {
+        await db.runAsync(`ALTER TABLE Albums ADD COLUMN updatedAt INTEGER`);
+      } catch (e) {
+        // Ignored if column already exists
+      }
+      currentVersion = 2;
     }
 
     await db.runAsync(`PRAGMA user_version = ${currentVersion}`);

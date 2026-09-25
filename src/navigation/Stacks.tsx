@@ -12,6 +12,7 @@ import { LicenseDetailScreen } from '@/features/settings/screens/LicenseDetailSc
 import { PersonalizeTasteScreen } from '@/features/settings/screens/PersonalizeTasteScreen';
 import { AppUpdatesScreen } from '@/features/settings/screens/AppUpdatesScreen';
 import { StorageSettingsScreen } from '@/features/settings/screens/StorageSettingsScreen';
+import { WidgetSettingsScreen } from '@/features/settings/screens/WidgetSettingsScreen';
 
 import { PlaylistDetailsScreen } from '@/features/shared/screens/PlaylistDetailsScreen';
 import { PodcastDetailsScreen } from '@/features/shared/screens/PodcastDetailsScreen';
@@ -19,6 +20,7 @@ import { AlbumDetailsScreen } from '@/features/shared/screens/AlbumDetailsScreen
 import { ArtistProfileScreen } from '@/features/shared/screens/ArtistProfileScreen';
 import { ExploreCategoryScreen } from '@/features/explore/screens/ExploreCategoryScreen';
 import { DownloadsScreen } from '@/features/library/screens/DownloadsScreen';
+import { LikedSongsScreen } from '@/features/library/screens/LikedSongsScreen';
 
 import {
   HomeStackParamList,
@@ -93,6 +95,7 @@ export function LibraryStackNavigator() {
       <LibraryStack.Screen name="ArtistProfile" component={ArtistProfileScreen} />
       <LibraryStack.Screen name="ExploreCategory" component={ExploreCategoryScreen} />
       <LibraryStack.Screen name="DownloadsScreen" component={DownloadsScreen} />
+      <LibraryStack.Screen name="LikedSongsScreen" component={LikedSongsScreen} />
     </LibraryStack.Navigator>
   );
 }
@@ -111,6 +114,7 @@ export function SettingsStackNavigator() {
       <SettingsStack.Screen name="PersonalizeTaste" component={PersonalizeTasteScreen} />
       <SettingsStack.Screen name="AppUpdates" component={AppUpdatesScreen} />
       <SettingsStack.Screen name="StorageSettings" component={StorageSettingsScreen} />
+      <SettingsStack.Screen name="WidgetSettings" component={WidgetSettingsScreen} />
     </SettingsStack.Navigator>
   );
 }

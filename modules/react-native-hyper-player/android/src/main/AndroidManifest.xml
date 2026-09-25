@@ -16,5 +16,72 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name="com.margelo.nitro.hyperplayer.widget.WidgetControlReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.margelo.nitro.hyperplayer.widget.WidgetPinSuccessReceiver"
+            android:exported="false" />
+
+        <!-- Classic Widget -->
+        <receiver android:name="com.margelo.nitro.hyperplayer.widget.HyperClassicWidgetProvider"
+            android:label="@string/widget_classic_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_classic_info" />
+        </receiver>
+
+        <!-- Pill Widget -->
+        <receiver android:name="com.margelo.nitro.hyperplayer.widget.HyperPillWidgetProvider"
+            android:label="@string/widget_pill_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_pill_info" />
+        </receiver>
+        <!-- Material Widget -->
+        <receiver android:name="com.margelo.nitro.hyperplayer.widget.HyperMaterialWidgetProvider"
+            android:label="@string/widget_material_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_material_info" />
+        </receiver>
+
+        <!-- Blur Widget -->
+        <receiver android:name="com.margelo.nitro.hyperplayer.widget.HyperBlurWidgetProvider"
+            android:label="@string/widget_blur_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_blur_info" />
+        </receiver>
+
+        <!-- Search Widget -->
+        <receiver android:name="com.margelo.nitro.hyperplayer.widget.HyperSearchWidgetProvider"
+            android:label="@string/widget_search_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_search_info" />
+        </receiver>
     </application>
 </manifest>

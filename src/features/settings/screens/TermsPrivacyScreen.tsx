@@ -23,12 +23,10 @@ export function TermsPrivacyScreen() {
   return (
     <Screen disableSafeAreaBottom>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft color={colors.text} size={24} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Legal</Text>
-        </View>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <ArrowLeft color={colors.text} size={28} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Legal</Text>
 
         <View style={styles.headerRight}>
           <View style={styles.filterGroup}>
@@ -73,22 +71,18 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+
   backButton: {
     padding: spacing.xs,
     marginRight: spacing.md,
   },
   headerTitle: {
+    flex: 1,
     fontSize: typography.title,
     fontWeight: 'bold',
-    color: colors.text,
   },
   headerRight: {
     flexDirection: 'row',

@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, { interpolate, Extrapolation, useAnimatedStyle, SharedValue } from 'react-native-reanimated';
-import { ListMusic, ListX } from 'lucide-react-native';
+import { ListMusic } from 'lucide-react-native';
 import { darkColors } from '@/theme/colors';
 import { spacing, typography } from '@/theme';
 import { useSettingsStore, usePlayerStore } from '@/store';
@@ -10,7 +10,7 @@ import { useSettingsStore, usePlayerStore } from '@/store';
  * Header for the queue section, containing the "Playing from" label and the toggle button
  * to open or close the queue sheet.
  */
-export const QueueHeaderComponent = memo(({ onToggleQueue, queueProgress, brandColor }: { onToggleQueue: () => void, queueProgress: SharedValue<number>, brandColor: string }) => {
+export const QueueHeaderComponent = memo(({ onToggleQueue, queueProgress, brandColor, textContrastColor }: { onToggleQueue: () => void, queueProgress: SharedValue<number>, brandColor: string, textContrastColor: string }) => {
   const queueBtnInactive = useAnimatedStyle(() => ({ opacity: interpolate(queueProgress.value, [0, 0.1], [1, 0], Extrapolation.CLAMP), position: 'absolute' }));
   const queueBtnActive = useAnimatedStyle(() => ({ opacity: interpolate(queueProgress.value, [0, 0.1], [0, 1], Extrapolation.CLAMP), position: 'absolute' }));
 
@@ -20,16 +20,16 @@ export const QueueHeaderComponent = memo(({ onToggleQueue, queueProgress, brandC
       <View style={[styles.queueHeaderRow, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View>
-            <Text style={styles.playingFrom}>Playing from</Text>
-            <Text style={styles.playingSource}>Your Queue</Text>
+            <Text style={[styles.playingFrom, { color: textContrastColor }]}>Playing from</Text>
+            <Text style={[styles.playingSource, { color: textContrastColor }]}>Your Queue</Text>
           </View>
         </View>
         <TouchableOpacity onPress={onToggleQueue} style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Animated.View style={queueBtnInactive}>
-            <ListMusic color={darkColors.white} size={24} />
+            <ListMusic color={textContrastColor} size={24} />
           </Animated.View>
           <Animated.View style={queueBtnActive}>
-            <ListX color={brandColor} size={24} />
+            <ListMusic color={brandColor} size={24} />
           </Animated.View>
         </TouchableOpacity>
       </View>

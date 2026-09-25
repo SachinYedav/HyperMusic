@@ -2,7 +2,7 @@ import React, { useMemo, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, Text, Linking, TouchableOpacity } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, ExternalLink, FileText, User, Link } from 'lucide-react-native';
+import { ArrowLeft, ExternalLink, FileBracesCorner, Box, User, Link } from 'lucide-react-native';
 import { Screen } from '@/ui/Screen';
 import { useTheme } from '@/theme/ThemeContext';
 import { spacing, typography, radius } from '@/theme';
@@ -47,11 +47,11 @@ export function LicenseDetailScreen() {
     <Screen disableSafeAreaBottom>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft color={colors.text} size={24} />
+          <ArrowLeft color={colors.text} size={28} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Details</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Details</Text>
         {!!repository && (
-          <TouchableOpacity style={styles.externalButton} onPress={openRepository}>
+          <TouchableOpacity style={styles.headerRight} onPress={openRepository}>
             <ExternalLink color={colors.text} size={22} />
           </TouchableOpacity>
         )}
@@ -66,7 +66,7 @@ export function LicenseDetailScreen() {
         <View style={styles.metaCard}>
           <SettingsSection colors={colors}>
             <SettingsActionRow
-              icon={FileText}
+              icon={FileBracesCorner}
               label="License Type"
               valueLabel={licenseType}
               colors={colors}
@@ -88,13 +88,14 @@ export function LicenseDetailScreen() {
                 isLast
                 colors={colors}
                 hideChevron={false}
+                isExternal={true}
               />
             )}
           </SettingsSection>
         </View>
 
         <View style={[styles.ackBox, { backgroundColor: ackBg, borderColor: ackBorder }]}>
-          <FileText color={ackIconColor} size={20} style={styles.ackIcon} />
+          <Box color={ackIconColor} size={20} style={styles.ackIcon} />
           <Text style={[styles.ackText, { color: colors.text }]}>{ackText}</Text>
         </View>
 
@@ -124,9 +125,8 @@ const getStyles = (colors: any) =>
       flex: 1,
       fontSize: typography.title,
       fontWeight: 'bold',
-      color: colors.text,
     },
-    externalButton: {
+    headerRight: {
       padding: spacing.xs,
     },
     content: {
@@ -159,7 +159,6 @@ const getStyles = (colors: any) =>
       alignItems: 'flex-start',
       padding: spacing.md,
       borderRadius: radius.md,
-      borderWidth: 1,
       marginBottom: spacing.xl,
       gap: spacing.md,
     },

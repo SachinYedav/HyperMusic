@@ -22,6 +22,7 @@ The custom media engine (`react-native-hyper-player`) depends on:
 - Package: `androidx.media3:media3-session:1.3.1`
 - Package: `androidx.media3:media3-common:1.3.1`
 - Package: `androidx.media3:media3-ui:1.3.1`
+- Package: `androidx.palette:palette:1.0.0`
 - Repository: https://github.com/androidx/media
 - License: Apache-2.0
 

@@ -108,20 +108,6 @@ export function setWifiOnlyNative(enabled: boolean): void {
 };
 
 /**
- * Updates the native Android foreground notification batch progress display.
- */
-export function updateBatchProgress(title: string, progressText: string, subtext: string | null, artworkUrl?: string, progress: number = 0, max: number = 0, isPaused: boolean = false): void {
-  HyperDownloader.updateBatchProgress(title, progressText, subtext, artworkUrl, progress, max, isPaused);
-}
-
-/**
- * Clears the native Android foreground notification batch progress display.
- */
-export function clearBatchProgress(): void {
-  HyperDownloader.clearBatchProgress();
-}
-
-/**
  * Subscribes to high-frequency download progress events.
  * @param listener Callback function receiving progress updates
  */

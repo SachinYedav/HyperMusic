@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { SQLiteProvider } from 'expo-sqlite';
+import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
 import { initializeDatabase } from './schema';
+import { setGlobalDb } from './globalDb';
 
 interface DatabaseProviderProps {
   children: React.ReactNode;
@@ -61,11 +62,24 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
           onInit={initializeDatabase}
           useSuspense={true}
         >
+          <DatabaseRegistryHook />
           {children}
         </SQLiteProvider>
       </React.Suspense>
     </DatabaseErrorBoundary>
   );
+}
+
+/**
+ * Internal hook to capture the SQLiteContext initialized by SQLiteProvider 
+ * and store it in our global registry for non-React services to use.
+ */
+function DatabaseRegistryHook() {
+  const db = useSQLiteContext();
+  React.useEffect(() => {
+    setGlobalDb(db);
+  }, [db]);
+  return null;
 }
 
 const boundaryStyles = StyleSheet.create({

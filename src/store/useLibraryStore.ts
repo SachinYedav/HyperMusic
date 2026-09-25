@@ -22,6 +22,7 @@ interface LibraryState {
   libraryRevision: number;
   
   init: (db: SQLiteDatabase) => Promise<void>;
+  incrementLibraryRevision: () => void;
   
   // Optimistic Toggles
   toggleAlbum: (db: SQLiteDatabase, id: string, title: string, artist?: string, coverUrl?: string) => Promise<void>;
@@ -41,6 +42,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   likedTrackIds: new Set(),
   isInitialized: false,
   libraryRevision: 0,
+  incrementLibraryRevision: () => set({ libraryRevision: Date.now() }),
 
   init: async (db: SQLiteDatabase) => {
     try {

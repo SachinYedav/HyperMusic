@@ -1,7 +1,7 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getAndClearCompletedDownloads, queueBatchDownload } from '../../../../modules/hyper-downloader/src';
-import { getAllPendingDownloads } from '@/database/queries/downloadQueries';
+import { getAllPendingDownloads, getPendingQueueItemWithTrack } from '@/database/queries/downloadQueries';
 import { upsertTrack, updateTrackLocalPaths, insertDownloadRecord, deleteDownloadQueueItem } from '@/database/queries';
 import { useDownloadStore } from '../store/useDownloadStore';
 import { downloadService } from './downloadService';
@@ -22,10 +22,7 @@ export const downloadSyncService = {
 
       for (const trackId of completedIds) {
         // Fetch track info to ensure it exists in Tracks table
-        const pendingQueueRow = await db.getFirstAsync<{trackId: string, trackType: string}>(
-          `SELECT t.*, q.id as queueId FROM DownloadQueue q JOIN Tracks t ON q.trackId = t.id WHERE q.trackId = ?`, 
-          [trackId]
-        );
+        const pendingQueueRow = await getPendingQueueItemWithTrack(db, trackId);
         
         if (pendingQueueRow) {
           const { audioFile, artFile } = downloadService.getLocalPaths(trackId, pendingQueueRow.trackType);

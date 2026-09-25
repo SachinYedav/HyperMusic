@@ -2,16 +2,13 @@
   "expo": {
     "name": "HyperMusic",
     "slug": "HyperMusic",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
       "package": "com.studio.hypermusic",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -23,11 +20,13 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.WAKE_LOCK"
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
       "expo-image",
+      "expo-media-library",
       "expo-sqlite",
       "expo-status-bar",
       [

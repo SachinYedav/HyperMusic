@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { Music3, Music4, Disc, MicSignal, User, Image as ImageIcon } from 'lucide-react-native';
+import { Music3, Music4, Disc, MicSignal, UserStar, Image as ImageIcon } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 
 export type ArtworkContextType = 'track' | 'playlist' | 'album' | 'podcast' | 'podcast_show' | 'artist' | 'song';
@@ -35,7 +35,7 @@ export const DynamicArtworkFallback: React.FC<DynamicArtworkFallbackProps> = ({
       case 'podcast_show':
         return <MicSignal size={iconSize} color={colors.textMuted} />;
       case 'artist':
-        return <User size={iconSize} color={colors.textMuted} />;
+        return <UserStar size={iconSize} color={colors.textMuted} />;
       default:
         return <ImageIcon size={iconSize} color={colors.textMuted} />;
     }

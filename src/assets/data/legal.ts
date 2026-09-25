@@ -76,7 +76,7 @@ export const termsData: LegalDocument = {
 
 export const privacyData: LegalDocument = {
   title: "Privacy Policy",
-  lastUpdated: "August 9, 2026",
+  lastUpdated: "september 17, 2026",
   sections: [
     {
       title: "1. Zero Data Collection Architecture",
@@ -103,7 +103,7 @@ export const privacyData: LegalDocument = {
       title: "4. Device Permissions & Background Services",
       paragraphs: [
         "HyperMusic requests operating system permissions strictly limited to the absolute technical minimum required for basic media playback and offline functionality.",
-        "• Notification Permission: Required to display media playback controls and download progress in your system tray.\n• Foreground Service (Media Playback & Data Sync) & Wake Lock: Required by the Android operating system to keep music playing in the background and to ensure batch media downloads continue successfully while the screen is off.\n• Microphone (Audio Recording): Requested strictly for the Native Voice Search (Speech-to-Text) functionality. Audio processing is handled by your device's native speech recognition engine; we do not record, transmit, or store your audio on any remote servers.\n• Local App Storage: Used within the app sandbox to maintain your offline media cache, saved library, playback history, and preferences."
+        "• Notification Permission: Required to display media playback controls and download progress in your system tray.\n• Foreground Service (Media Playback & Data Sync) & Wake Lock: Required by the Android operating system to keep music playing in the background and to ensure batch media downloads continue successfully while the screen is off.\n• Microphone (Audio Recording): Requested strictly for the Native Voice Search (Speech-to-Text) functionality. Audio processing is handled by your device's native speech recognition engine; we do not record, transmit, or store your audio on any remote servers.\n• Device Media Files (Storage): Requested exclusively to scan and play locally stored audio and video files directly within the application. The application does not upload, share, or analyze your personal media files beyond providing local playback functionality.\n• Local App Storage: Used within the app sandbox to maintain your offline media cache, saved library, playback history, and preferences."
       ]
     },
     {

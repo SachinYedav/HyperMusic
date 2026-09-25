@@ -56,8 +56,8 @@ export const MiniPlayerComponent = memo(({
       >
         <Animated.View style={artStyle} />
         <View style={styles.miniInfo}>
-          <MarqueeText style={styles.miniTitle}>{track?.title || 'Not Playing'}</MarqueeText>
-          <Text style={styles.miniArtist} numberOfLines={1}>{track?.artist || 'Unknown'}{track?.album && !track.artist?.includes(track.album) ? ` • ${track.album}` : ''}</Text>
+          <MarqueeText style={[styles.miniTitle, { color: iconColor }]}>{track?.title || 'Not Playing'}</MarqueeText>
+          <Text style={[styles.miniArtist, { color: iconColor, opacity: 0.9 }]} numberOfLines={1}>{track?.artist || 'Unknown'}{track?.album && !track.artist?.includes(track.album) ? ` • ${track.album}` : ''}</Text>
         </View>
         <TouchableOpacity style={styles.miniBtn} onPress={togglePlayPause}>
           {playbackState === 'error' ? (
@@ -75,7 +75,7 @@ export const MiniPlayerComponent = memo(({
         </TouchableOpacity>
       </TouchableOpacity>
       <View style={styles.miniProgressTrack}>
-        <View style={[styles.miniProgressFill, { width: `${progress}%` }]} />
+        <View style={[styles.miniProgressFill, { width: `${progress}%`, backgroundColor: iconColor }]} />
       </View>
     </>
   );
@@ -88,9 +88,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md,
   },
   miniInfo: { flex: 1, flexShrink: 1, marginLeft: spacing.md, marginRight: spacing.sm, justifyContent: 'center', overflow: 'hidden' },
-  miniTitle: { fontSize: typography.body, fontWeight: '700', letterSpacing: -0.2, color: darkColors.white, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  miniArtist: { fontSize: typography.captionLg, marginTop: 1, color: 'rgba(255,255,255,0.9)', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  miniTitle: { fontSize: typography.body, fontWeight: '700', letterSpacing: -0.2 },
+  miniArtist: { fontSize: typography.captionLg, marginTop: 1 },
   miniBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginLeft: spacing.xs, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.5, shadowRadius: 3, elevation: 4 },
   miniProgressTrack: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
-  miniProgressFill: { height: '100%', backgroundColor: darkColors.white },
+  miniProgressFill: { height: '100%' },
 });

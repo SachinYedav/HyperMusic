@@ -26,6 +26,7 @@ export type LibraryStackParamList = {
   ExploreCategory: { categoryId: string; title: string };
   PodcastDetails: { id: string; name?: string; coverUrl?: string };
   DownloadsScreen: undefined;
+  LikedSongsScreen: undefined;
 };
 
 export type SettingsStackParamList = {
@@ -36,6 +37,7 @@ export type SettingsStackParamList = {
   PersonalizeTaste: undefined;
   AppUpdates: undefined;
   StorageSettings: undefined;
+  WidgetSettings: undefined;
 };
 
 export type MainTabParamList = {

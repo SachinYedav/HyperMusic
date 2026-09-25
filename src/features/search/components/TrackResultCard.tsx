@@ -15,13 +15,14 @@ interface TrackResultCardProps {
   onPress: (track: ExtractedTrack) => void;
   isPlaying?: boolean;
   hideEQOverlay?: boolean;
+  textColor?: string;
 }
 
-export const TrackResultCard: React.FC<TrackResultCardProps> = React.memo(({ track, onPress, isPlaying = false, hideEQOverlay = false }) => {
+export const TrackResultCard: React.FC<TrackResultCardProps> = React.memo(({ track, onPress, isPlaying = false, hideEQOverlay = false, textColor }) => {
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { openSheet } = useActionSheetStore();
-  
+
   const isDownloaded = useDownloadStore(state => !!state.completedDownloads[track.id]);
 
   const handleArtistPress = () => {
@@ -37,31 +38,31 @@ export const TrackResultCard: React.FC<TrackResultCardProps> = React.memo(({ tra
 
     if (artistId) {
       if ((track as any).type === 'artist') {
-        navigation.navigate('ArtistProfile', { 
-          id: artistId, 
-          artistName: track.title, 
-          artworkUrl: track.artworkUrl 
+        navigation.navigate('ArtistProfile', {
+          id: artistId,
+          artistName: track.title,
+          artworkUrl: track.artworkUrl
         });
       } else {
-        navigation.navigate('ArtistProfile', { 
-          id: artistId, 
-          artistName: artistName 
+        navigation.navigate('ArtistProfile', {
+          id: artistId,
+          artistName: artistName
         });
       }
     }
   };
 
   return (
-    <TouchableOpacity 
-      style={styles.container} 
+    <TouchableOpacity
+      style={styles.container}
       onPress={() => onPress(track)}
       activeOpacity={0.7}
     >
       <View>
-        <PremiumImage 
-          source={{ uri: track.artworkUrl }} 
+        <PremiumImage
+          source={{ uri: track.artworkUrl }}
           contextType={(track as any).type === 'artist' ? 'artist' : ((track as any).type || 'track')}
-          style={[styles.artwork, { backgroundColor: colors.border }]} 
+          style={[styles.artwork, { backgroundColor: colors.border }]}
           fallbackIconSize={20}
         />
         {isPlaying && !hideEQOverlay && (
@@ -71,34 +72,34 @@ export const TrackResultCard: React.FC<TrackResultCardProps> = React.memo(({ tra
         )}
       </View>
       <View style={styles.infoContainer}>
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.title, { color: textColor || colors.text }]} numberOfLines={1}>
           {track.title}
         </Text>
-        <TouchableOpacity 
-          onPress={handleArtistPress} 
+        <TouchableOpacity
+          onPress={handleArtistPress}
           disabled={!track.artistId}
           hitSlop={{ top: 5, bottom: 5, left: 0, right: 0 }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             {isDownloaded && <CheckCircle2 size={14} color={colors.success} />}
-            <Text style={[styles.artist, { color: colors.textMuted }]} numberOfLines={1}>
+            <Text style={[styles.artist, { color: textColor || colors.textMuted, opacity: textColor ? 0.8 : 1 }]} numberOfLines={1}>
               {track.artist}{track.album && !track.artist.includes(track.album) ? ` • ${track.album}` : ''}
             </Text>
           </View>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity 
-        style={styles.moreButton} 
+      <TouchableOpacity
+        style={styles.moreButton}
         hitSlop={10}
         onPress={() => {
-          const contextType = (track as any).type === 'artist' ? 'artist' 
+          const contextType = (track as any).type === 'artist' ? 'artist'
             : (track as any).type === 'album' ? 'album'
-            : (track as any).type === 'playlist' ? 'playlist'
-            : 'track';
+              : (track as any).type === 'playlist' ? 'playlist'
+                : 'track';
           openSheet(contextType, track);
         }}
       >
-        <MoreVertical color={colors.text} size={20} />
+        <MoreVertical color={textColor || colors.text} size={20} />
       </TouchableOpacity>
     </TouchableOpacity>
   );

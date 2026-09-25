@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, spacing, typography, radius } from '@/theme';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '@/navigation/types';
-import { getColors } from 'react-native-image-colors';
+import { useImageColors } from '@/hooks/useImageColors';
 import { TrackResultCard } from '../../search/components/TrackResultCard';
 import { usePlayerStore } from '@/store';
 import { useQuery } from '@tanstack/react-query';
@@ -22,7 +22,6 @@ export function PodcastDetailsScreen({ navigation, route }: Props) {
 
   const playList = usePlayerStore((state) => state.playList);
   const activeTrack = usePlayerStore((state) => state.activeTrack);
-  const [dominantColor, setDominantColor] = useState<string>(colors.border);
 
   const { data: podcastData, isLoading, error, refetch } = useQuery({
     queryKey: ['podcast', route.params.id, !!db],
@@ -34,21 +33,7 @@ export function PodcastDetailsScreen({ navigation, route }: Props) {
     enabled: true,
   });
 
-  useEffect(() => {
-    if (podcastData?.artworkUrl) {
-      getColors(podcastData.artworkUrl, {
-        fallback: colors.border,
-        cache: true,
-        key: podcastData.artworkUrl,
-      }).then((c) => {
-        if (c.platform === 'android') {
-          setDominantColor(c.dominant || dominantColor);
-        } else if (c.platform === 'ios') {
-          setDominantColor(c.primary || dominantColor);
-        }
-      });
-    }
-  }, [isDark, podcastData?.artworkUrl]);
+  const { dominantColor } = useImageColors(podcastData?.artworkUrl, { fallback: colors.border });
 
   const optimisticData = {
     title: podcastData?.title || route.params.name || 'Loading...',

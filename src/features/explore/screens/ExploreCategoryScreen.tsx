@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useTheme, spacing, typography, radius } from '@/theme';
+import { useTheme, spacing, typography } from '@/theme';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '@/navigation/types';
 import Animated, {
@@ -144,47 +144,7 @@ export function ExploreCategoryScreen({ navigation, route }: Props) {
       return <HeroBannerCard section={item} />;
     }
 
-    if (item.type === 'grid' && item.items?.length > 0 && (item.items[0].type === 'video' || item.items[0].type === 'podcast')) {
-      return <FeedCarousel section={item} />;
-    }
-
-    if (item.type === 'grid' && item.items?.length > 0 && item.items[0].type === 'genre') {
-      return (
-        <View style={styles.gridSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{item.title}</Text>
-          <View style={styles.tileGrid}>
-            {item.items.map((browseItem: BrowseItem, idx: number) => {
-              const colorPalette = ['#8A2BE2', colors.brand, '#FF8C00', '#2E8B57', '#008080', '#4169E1', '#C71585', '#D2691E'];
-              const tileColor = colorPalette[idx % colorPalette.length];
-
-              return (
-                <Pressable
-                  key={browseItem.id + idx}
-                  style={[styles.genreTile, { backgroundColor: tileColor }]}
-                  onPress={() => {
-                    if (browseItem.type === 'genre') {
-                      (navigation as any).push('ExploreCategory', { categoryId: browseItem.id, title: browseItem.title });
-                    } else if (browseItem.type === 'song' || browseItem.type === 'video' || browseItem.type === 'podcast') {
-                      playTrack({ id: browseItem.id, title: browseItem.title, artist: browseItem.subtitle, artwork: browseItem.artworkUrl, url: '', duration: 0 });
-                    } else if (browseItem.type === 'album') {
-                      navigation.navigate('AlbumDetails', { id: browseItem.id });
-                    } else if (browseItem.type === 'playlist') {
-                      navigation.navigate('PlaylistDetails', { id: browseItem.id });
-                    } else if (browseItem.type === 'artist') {
-                      navigation.navigate('ArtistProfile', { id: browseItem.id });
-                    }
-                  }}
-                >
-                  <Text style={[styles.genreTileText, { color: colors.white, textShadowColor: colors.overlayLight }]}>{browseItem.title}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      );
-    }
-
-    // Default to Carousel
+    // Default to Carousel for all other grids (videos, podcasts, artists, etc)
     return <FeedCarousel section={item} />;
   }, [colors.brand, colors.text, navigation, playTrack]);
 
@@ -193,7 +153,6 @@ export function ExploreCategoryScreen({ navigation, route }: Props) {
     switch (categoryId) {
       case 'new': return colors.brand;
       case 'charts': return '#8A2BE2';
-      case 'moods': return '#FF8C00';
       case 'podcasts': return '#2E8B57';
       default: return colors.brand;
     }
@@ -266,12 +225,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: HEADER_MAX_HEIGHT,
-  },
   header: {
     position: 'absolute',
     top: 0,
@@ -319,66 +272,5 @@ const styles = StyleSheet.create({
     fontSize: typography.header,
     fontWeight: 'bold',
     marginBottom: spacing.md,
-  },
-  heroSection: {
-    marginBottom: spacing.xxl,
-    paddingHorizontal: spacing.md,
-  },
-  heroCard: {
-    height: 220,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-  },
-  heroImage: {
-    ...StyleSheet.absoluteFill as any,
-  },
-  heroGradient: {
-    ...StyleSheet.absoluteFill as any,
-  },
-  heroContent: {
-    padding: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  heroTitle: {
-    fontSize: typography.title,
-    fontWeight: 'bold',
-    marginBottom: spacing.xs,
-  },
-  heroSubtitle: {
-    fontSize: typography.bodySm,
-  },
-  heroPlayBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-  },
-  heroPlayText: {
-    fontWeight: 'bold',
-    fontSize: typography.bodySm,
-  },
-  gridSection: {
-    marginBottom: spacing.xxl,
-    paddingHorizontal: spacing.md,
-  },
-  tileGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  genreTile: {
-    width: '48%',
-    height: 80,
-    borderRadius: radius.sm,
-    padding: spacing.md,
-    justifyContent: 'flex-end',
-  },
-  genreTileText: {
-    fontSize: typography.body,
-    fontWeight: 'bold',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
 });

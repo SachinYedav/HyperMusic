@@ -1,6 +1,6 @@
 {
   "name": "react-native-hyper-extractor",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Custom internal extraction engine for HyperMusic, built with Nitro Modules.",
   "main": "./lib/commonjs/index.js",
@@ -60,7 +60,7 @@
     "conventional-changelog-conventionalcommits": "^9.1.0",
     "nitrogen": "0.36.1",
     "react": "19.2.3",
-    "react-native": "0.86.0",
+    "react-native": "0.86.3",
     "react-native-builder-bob": "^0.40.18",
     "react-native-nitro-modules": "0.36.1",
     "semantic-release": "^25.0.3",

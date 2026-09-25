@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, ScrollView, Linking, AppState, PermissionsAndro
 import { useTheme, typography, spacing, radius } from '@/theme';
 import { Screen } from '@/ui/Screen';
 import { useThemeStore, useSettingsStore } from '@/store';
-import { Moon, Sun, Smartphone, Headphones, DownloadCloud, HardDrive, Repeat, Wifi, Info, Music, Settings as SettingsIcon, ChevronRight, RefreshCw, Handshake, Scale, Code, Bug, Sliders, User, Clock, Bell, Mic, Wand2 } from 'lucide-react-native';
+import { Moon, Sun, MonitorSmartphone, Palette, ListMusic, LayoutTemplate, Bell, Mic, FolderSearch, Infinity, AudioWaveform, Leaf, ArrowDownToLine, Router, PieChart, CircleUserRound, SlidersHorizontal, Timer, Info, ArrowUpCircle, ShieldCheck, BookOpen, Terminal, Bug } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SettingsStackParamList } from '@/navigation/types';
 import Constants from 'expo-constants';
 import { SettingsSection, SettingsSwitchRow, SettingsActionRow, SettingsSelectRow } from '../components/SettingsComponents';
 import { SettingsSelectionSheet } from '../components/SettingsSelectionSheet';
+import * as MediaLibrary from 'expo-media-library';
 /**
  * Global application settings workspace managing theme mode preferences, streaming/download quality configurations, and local cache invalidation.
  */
@@ -22,6 +23,7 @@ export function SettingsScreen() {
 
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
   const [hasMicPermission, setHasMicPermission] = useState(false);
+  const [hasMediaPermission, setHasMediaPermission] = useState(false);
 
   useEffect(() => {
     const checkPerm = async () => {
@@ -39,6 +41,9 @@ export function SettingsScreen() {
         setHasNotificationPermission(true);
         setHasMicPermission(true);
       }
+
+      const mediaResponse = await MediaLibrary.getPermissionsAsync();
+      setHasMediaPermission(mediaResponse.granted);
     };
     checkPerm();
     const sub = AppState.addEventListener('change', (state) => {
@@ -81,8 +86,23 @@ export function SettingsScreen() {
     }
   };
 
+  const handleMediaToggle = async (val: boolean) => {
+    if (Platform.OS === 'android') {
+      if (val && !hasMediaPermission) {
+        const response = await MediaLibrary.requestPermissionsAsync();
+        if (response.granted) {
+          setHasMediaPermission(true);
+        } else if (!response.canAskAgain) {
+          Linking.openSettings();
+        }
+      } else if (!val && hasMediaPermission) {
+        Linking.openSettings();
+      }
+    }
+  };
+
   const themeOptions = [
-    { id: 'system', label: 'System Default', icon: Smartphone },
+    { id: 'system', label: 'System Default', icon: MonitorSmartphone },
     { id: 'light', label: 'Light', icon: Sun },
     { id: 'dark', label: 'Dark', icon: Moon },
   ] as const;
@@ -115,18 +135,27 @@ export function SettingsScreen() {
 
         <SettingsSection title="Personalization" colors={colors}>
           <SettingsActionRow
-            icon={Wand2}
-            label="Home Background Theme"
+            icon={Palette}
+            label="Background Theme"
             valueLabel={themeState.homeBackgroundTheme.charAt(0).toUpperCase() + themeState.homeBackgroundTheme.slice(1)}
             onPress={() => setSheetConfig({ visible: true, type: 'theme' })}
             colors={colors}
             isDark={isDark}
+            isSelector={true}
           />
           <SettingsActionRow
-            icon={Music}
-            label="Personalize Music Taste"
-            valueLabel=""
+            icon={ListMusic}
+            label="Music Preferences"
+            valueLabel="Customize"
             onPress={() => navigation.navigate('PersonalizeTaste')}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsActionRow
+            icon={LayoutTemplate}
+            label="Widgets"
+            valueLabel="Pin"
+            onPress={() => navigation.navigate('WidgetSettings')}
             isLast={true}
             colors={colors}
             isDark={isDark}
@@ -136,7 +165,7 @@ export function SettingsScreen() {
         <SettingsSection title="App Permissions" colors={colors}>
           <SettingsSwitchRow
             icon={Bell}
-            label="Push Notifications"
+            label="Notifications"
             value={hasNotificationPermission}
             onValueChange={handleNotificationToggle}
             colors={colors}
@@ -144,9 +173,17 @@ export function SettingsScreen() {
           />
           <SettingsSwitchRow
             icon={Mic}
-            label="Microphone (Voice Search)"
+            label="Microphone Access"
             value={hasMicPermission}
             onValueChange={handleMicToggle}
+            colors={colors}
+            isDark={isDark}
+          />
+          <SettingsSwitchRow
+            icon={FolderSearch}
+            label="Local Media Access"
+            value={hasMediaPermission}
+            onValueChange={handleMediaToggle}
             isLast={true}
             colors={colors}
             isDark={isDark}
@@ -155,7 +192,7 @@ export function SettingsScreen() {
 
         <SettingsSection title="Audio & Playback" colors={colors}>
           <SettingsSwitchRow
-            icon={Repeat}
+            icon={Infinity}
             label="Autoplay"
             value={settings.autoplay}
             onValueChange={settings.setAutoplay}
@@ -163,15 +200,16 @@ export function SettingsScreen() {
             isDark={isDark}
           />
           <SettingsActionRow
-            icon={Headphones}
+            icon={AudioWaveform}
             label="Streaming Quality"
             valueLabel={qualityOptions.find(q => q.id === settings.streamingQuality)?.label}
             onPress={() => setSheetConfig({ visible: true, type: 'streaming' })}
             colors={colors}
             isDark={isDark}
+            isSelector={true}
           />
           <SettingsSwitchRow
-            icon={Wifi}
+            icon={Leaf}
             label="Data Saver Mode"
             value={settings.dataSaver}
             onValueChange={settings.setDataSaver}
@@ -183,15 +221,16 @@ export function SettingsScreen() {
 
         <SettingsSection title="Downloads & Storage" colors={colors}>
           <SettingsActionRow
-            icon={DownloadCloud}
+            icon={ArrowDownToLine}
             label="Download Quality"
             valueLabel={qualityOptions.find(q => q.id === settings.downloadQuality)?.label}
             onPress={() => setSheetConfig({ visible: true, type: 'download' })}
             colors={colors}
             isDark={isDark}
+            isSelector={true}
           />
           <SettingsSwitchRow
-            icon={Wifi}
+            icon={Router}
             label="Download over Wi-Fi only"
             value={settings.downloadWifiOnly}
             onValueChange={settings.setDownloadWifiOnly}
@@ -199,7 +238,7 @@ export function SettingsScreen() {
             isDark={isDark}
           />
           <SettingsActionRow
-            icon={HardDrive}
+            icon={PieChart}
             label="Storage Management"
             valueLabel=""
             onPress={() => navigation.navigate('StorageSettings')}
@@ -211,21 +250,21 @@ export function SettingsScreen() {
 
         <SettingsSection title="Coming Soon" colors={colors}>
           <SettingsActionRow
-            icon={User}
+            icon={CircleUserRound}
             label="Local Profile"
             onPress={() => { }}
             colors={colors}
             isDark={isDark}
           />
           <SettingsActionRow
-            icon={Sliders}
+            icon={SlidersHorizontal}
             label="Equalizer"
             onPress={() => { }}
             colors={colors}
             isDark={isDark}
           />
           <SettingsActionRow
-            icon={Clock}
+            icon={Timer}
             label="Sleep Timer"
             onPress={() => { }}
             isLast={true}
@@ -244,32 +283,33 @@ export function SettingsScreen() {
             hideChevron={true}
           />
           <SettingsActionRow
-            icon={RefreshCw}
+            icon={ArrowUpCircle}
             label="App Updates"
             onPress={() => navigation.navigate('AppUpdates')}
             colors={colors}
             isDark={isDark}
           />
           <SettingsActionRow
-            icon={Handshake}
+            icon={ShieldCheck}
             label="Privacy Policy & Terms"
             onPress={() => navigation.navigate('TermsPrivacy')}
             colors={colors}
             isDark={isDark}
           />
           <SettingsActionRow
-            icon={Scale}
+            icon={BookOpen}
             label="Open Source Licenses"
             onPress={() => navigation.navigate('Licenses')}
             colors={colors}
             isDark={isDark}
           />
           <SettingsActionRow
-            icon={Code}
+            icon={Terminal}
             label="Source Code (GitHub)"
             onPress={() => Linking.openURL('https://github.com/SachinYedav/hypermusic')}
             colors={colors}
             isDark={isDark}
+            isExternal={true}
           />
           <SettingsActionRow
             icon={Bug}
@@ -278,6 +318,7 @@ export function SettingsScreen() {
             isLast={true}
             colors={colors}
             isDark={isDark}
+            isExternal={true}
           />
         </SettingsSection>
 
@@ -316,10 +357,13 @@ export function SettingsScreen() {
 
 const styles = StyleSheet.create({
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
   headerTitle: {
+    flex: 1,
     fontSize: typography.title,
     fontWeight: 'bold',
   },

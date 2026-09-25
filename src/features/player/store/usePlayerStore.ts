@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Track } from '@/types';
+import { ImagePalette } from '@/hooks/useImageColors';
 import { HyperPlayer } from 'react-native-hyper-player';
 import { useDownloadStore } from '../../library/store/useDownloadStore';
 import { useToastStore } from '@/store/useToastStore';
@@ -29,12 +30,12 @@ interface PlayerState {
 
   expandPlayerSignal: number;
   collapsePlayerSignal: number;
-  colorCache: Record<string, string>;
+  colorCache: Record<string, ImagePalette>;
 
   isVideoMode: boolean;
   setIsVideoMode: (isVideo: boolean) => void;
 
-  setColorCache: (trackId: string, color: string) => void;
+  setColorCache: (trackId: string, palette: ImagePalette) => void;
 
   /**
    * Passive setters for Native Engine events.
@@ -169,7 +170,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (!track) {
       set({ activeTrack: null, isMiniPlayerVisible: false, isPlaying: false, isBuffering: false });
     } else {
-      const shouldBeVideo = track.trackType === 'video' || track.trackType === 'podcast';
+      const shouldBeVideo = track.trackType === 'video' || track.trackType === 'podcast' || track.trackType === 'local_device_video';
 
       // Respect the UI mode switch lock if user recently toggled manually
       if (modeSwitchLockTimeout) {

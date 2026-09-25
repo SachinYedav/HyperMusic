@@ -10,6 +10,7 @@ import { MoreVertical } from 'lucide-react-native';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
 import { AnimatedEQ } from '@/ui/AnimatedEQ';
 import { HeroBannerCard } from './HeroBannerCard';
+import { QuickPreviewShelf } from './QuickPreviewShelf';
 
 interface FeedCarouselProps {
   section: BrowseShelf;
@@ -31,6 +32,10 @@ const chunkArray = (arr: BrowseItem[], size: number) => {
 export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }) => {
   if (section.type === 'grid' && section.items?.length > 0 && (section.items[0].type === 'playlist' || section.items[0].type === 'album')) {
     return <HeroBannerCard section={section} />;
+  }
+
+  if (section.type === 'quick_preview_carousel') {
+    return <QuickPreviewShelf section={section} />;
   }
 
   const { colors } = useTheme();
@@ -96,7 +101,7 @@ export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }
   }, []);
 
   // Determine if this shelf should be rendered as Quick Picks (Grid)
-  const isQuickPicks = section.items.length > 0 && section.items.every((i: BrowseItem) => 
+  const isQuickPicks = section.items.length > 0 && section.items.every((i: BrowseItem) =>
     i.type === 'song' || i.type === 'video' || i.type === 'podcast' || i.type === 'artist'
   );
 
@@ -127,10 +132,10 @@ export const FeedCarousel: React.FC<FeedCarouselProps> = React.memo(({ section }
                 </Text>
               )}
               <View style={{ width: 48, height: 48 }}>
-                <PremiumImage 
-                  source={{ uri: track.artworkUrl }} 
+                <PremiumImage
+                  source={{ uri: track.artworkUrl }}
                   contextType={isArtist ? 'artist' : (track.type === 'song' || track.type === 'video' ? 'track' : (track.type as any))}
-                  style={[styles.quickPickImage, { width: '100%', height: '100%', backgroundColor: colors.border }, isArtist && { borderRadius: radius.full }]} 
+                  style={[styles.quickPickImage, { width: '100%', height: '100%', backgroundColor: colors.border }, isArtist && { borderRadius: radius.full }]}
                   fallbackIconSize={24}
                 />
                 {isPlaying && <AnimatedEQ isOverlay />}

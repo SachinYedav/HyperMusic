@@ -1,12 +1,13 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated as RNAnimated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TouchableHighlight, Animated as RNAnimated } from 'react-native';
 import { Image } from 'expo-image';
 import { useTheme, spacing, radius, typography } from '@/theme';
 import { useToastStore } from '@/store/useToastStore';
 import { ExtractedTrack } from 'react-native-hyper-extractor';
-import { MoreVertical, Trash2 } from 'lucide-react-native';
+import { MoreVertical, Trash2, Music } from 'lucide-react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { RectButton } from 'react-native-gesture-handler';
+import { formatBytes } from '@/utils/formatters';
 
 interface LibraryListItemProps {
   track: ExtractedTrack;
@@ -34,12 +35,12 @@ export const LibraryListItem: React.FC<LibraryListItemProps> = React.memo(({ tra
 
     const bgOpacity = progress.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 0.3], 
+      outputRange: [0, 0.3],
     });
 
     return (
       <View style={{ width: 80, height: '100%' }}>
-        <RNAnimated.View 
+        <RNAnimated.View
           style={{
             position: 'absolute',
             top: 0,
@@ -51,7 +52,7 @@ export const LibraryListItem: React.FC<LibraryListItemProps> = React.memo(({ tra
           }}
         />
         <RNAnimated.View style={{ height: '100%', opacity: progress }}>
-          <RectButton 
+          <RectButton
             style={[styles.deleteAction, { backgroundColor: colors.error, height: '100%' }]}
             onPress={() => {
               swipeableRef.current?.close();
@@ -68,39 +69,56 @@ export const LibraryListItem: React.FC<LibraryListItemProps> = React.memo(({ tra
   };
 
   const ListItemContent = (
-    <TouchableOpacity 
-      style={styles.container} 
+    <TouchableHighlight
+      style={{ borderRadius: radius.sm, overflow: 'hidden' }}
       onPress={() => onPress(track)}
-      activeOpacity={0.7}
+      onLongPress={() => {
+        if (onMorePress) {
+          onMorePress(track);
+        } else {
+          useToastStore.getState().showToast('More options coming soon', 'info');
+        }
+      }}
+      activeOpacity={0.6}
+      underlayColor={colors.brand + '40'}
     >
-      <Image 
-        source={track.artworkUrl} 
-        style={[styles.artwork, { backgroundColor: colors.border }]} 
-        contentFit="cover"
-        transition={200}
-      />
-      <View style={styles.infoContainer}>
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-          {track.title}
-        </Text>
-        <Text style={[styles.artist, { color: colors.textMuted }]} numberOfLines={1}>
-          {track.artist}
-        </Text>
+      <View style={styles.container}>
+        {track.artworkUrl ? (
+          <Image
+            source={track.artworkUrl}
+            style={[styles.artwork, { backgroundColor: colors.border }]}
+            contentFit="cover"
+            transition={200}
+          />
+        ) : (
+          <View style={[styles.artwork, styles.fallbackArtwork, { backgroundColor: colors.border }]}>
+            <Music color={colors.textMuted} size={24} />
+          </View>
+        )}
+        <View style={styles.infoContainer}>
+          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+            {track.title}
+          </Text>
+          <Text style={[styles.artist, { color: colors.textMuted }]} numberOfLines={1}>
+            {track.artist}
+            {(track as any).size ? ` • ${formatBytes((track as any).size)}` : ''}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.moreButton}
+          hitSlop={10}
+          onPress={() => {
+            if (onMorePress) {
+              onMorePress(track);
+            } else {
+              useToastStore.getState().showToast('More options coming soon', 'info');
+            }
+          }}
+        >
+          <MoreVertical color={colors.text} size={20} />
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity 
-        style={styles.moreButton} 
-        hitSlop={10}
-        onPress={() => {
-          if (onMorePress) {
-            onMorePress(track);
-          } else {
-            useToastStore.getState().showToast('More options coming soon', 'info');
-          }
-        }}
-      >
-        <MoreVertical color={colors.text} size={20} />
-      </TouchableOpacity>
-    </TouchableOpacity>
+    </TouchableHighlight>
   );
 
   if (onDelete) {
@@ -124,12 +142,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.xs,
   },
   artwork: {
     width: 48,
     height: 48,
     borderRadius: radius.xs,
+  },
+  fallbackArtwork: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   infoContainer: {
     flex: 1,

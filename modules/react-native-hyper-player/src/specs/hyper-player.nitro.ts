@@ -19,6 +19,12 @@ export interface MediaMetadata {
   artworkUrl: string;
 }
 
+/** Stable widget identifiers shared across JavaScript and Android. */
+export type WidgetStyle = 'classic' | 'material' | 'blur' | 'search' | 'pill';
+
+/** Result of asking the launcher to begin its widget pinning flow. */
+export type WidgetPinRequestResult = 'unsupported' | 'requestStarted' | 'failed';
+
 /**
  * Native Nitro specification contract for high-performance cross-language execution.
  * Bridges Javascript runtime directly to the native AndroidX Media3 engine.
@@ -64,6 +70,9 @@ export interface HyperPlayer extends HybridObject<{ android: 'kotlin' }> {
 
   /** Sets the global streaming quality for the JIT Extractor */
   setGlobalStreamingQuality(quality: string): void;
+
+  /** Starts the Android launcher flow to pin a widget style to the home screen. */
+  requestPinWidget(style: WidgetStyle): WidgetPinRequestResult;
 }
 
 // Nitro will automatically bind the Hybrid object to this if implemented natively

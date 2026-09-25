@@ -19,9 +19,10 @@ import { useSafeDatabase } from '@/database/useSafeDatabase';
 import { AppConfirmSheet } from '@/ui/AppConfirmSheet';
 import { useAppUpdater } from '@/hooks/useAppUpdater';
 
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, LinkingOptions } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RootNavigator } from '@/navigation/RootNavigator';
+import type { RootStackParamList } from '@/navigation/types';
 import { DatabaseProvider } from '@/database/DatabaseProvider';
 import * as SplashScreen from 'expo-splash-screen';
 import { AnimatedSplashScreen } from '@/ui/AnimatedSplashScreen';
@@ -92,10 +93,39 @@ function InnerApp() {
     };
   }, [db]);
 
+  const linking: LinkingOptions<RootStackParamList> = {
+    prefixes: ['hypermusic://'],
+    async getInitialURL() {
+      const url = await Linking.getInitialURL();
+      return url;
+    },
+    subscribe(listener: (url: string) => void) {
+      const linkingSubscription = Linking.addEventListener('url', ({ url }) => {
+        listener(url);
+      });
+      return () => {
+        linkingSubscription.remove();
+      };
+    },
+    config: {
+      screens: {
+        MainTabs: {
+          screens: {
+            Search: {
+              screens: {
+                SearchMain: 'widget/:id/search',
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <NavigationContainer theme={navTheme}>
+      <NavigationContainer theme={navTheme} linking={linking}>
         <RootNavigator />
         <GlobalActionSheet />
         <PlaylistSelectionSheet />

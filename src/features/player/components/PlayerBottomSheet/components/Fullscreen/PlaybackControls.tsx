@@ -71,7 +71,7 @@ export const PlaybackControlsComponent = memo(({ isPlaying, isLoading, isResolvi
     if (isLoading) {
       sweepTranslateX.value = withRepeat(
         withTiming(400, { duration: 1500 }),
-        -1, 
+        -1,
         false
       );
     } else {

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, spacing, typography } from '@/theme';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '@/navigation/types';
-import { getColors } from 'react-native-image-colors';
+import { useImageColors } from '@/hooks/useImageColors';
 import { TrackResultCard } from '../../search/components/TrackResultCard';
 import { usePlayerStore } from '@/store';
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +27,6 @@ export function AlbumDetailsScreen({ navigation, route }: Props) {
 
   const playList = usePlayerStore((state) => state.playList);
   const activeTrack = usePlayerStore((state) => state.activeTrack);
-  const [dominantColor, setDominantColor] = useState<string>(colors.border);
 
   const { data: albumData, isLoading, error, refetch } = useQuery({
     queryKey: ['album', route.params.id],
@@ -58,21 +57,7 @@ export function AlbumDetailsScreen({ navigation, route }: Props) {
     enabled: (isLocal || isSaved) ? !!db : true,
   });
 
-  useEffect(() => {
-    if (albumData?.artworkUrl) {
-      getColors(albumData.artworkUrl, {
-        fallback: colors.border,
-        cache: true,
-        key: albumData.artworkUrl,
-      }).then((c) => {
-        if (c.platform === 'android') {
-          setDominantColor(c.dominant || dominantColor);
-        } else if (c.platform === 'ios') {
-          setDominantColor(c.primary || dominantColor);
-        }
-      });
-    }
-  }, [isDark, albumData?.artworkUrl]);
+  const { dominantColor } = useImageColors(albumData?.artworkUrl, { fallback: colors.border });
 
   const optimisticData = {
     title: albumData?.title || route.params.name || 'Loading...',

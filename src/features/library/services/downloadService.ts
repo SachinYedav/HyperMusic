@@ -25,7 +25,9 @@ import {
   resumeAllPaused,
   updateQueueStatus,
   markTrackDownloaded,
-  deleteDownloadRecord
+  deleteDownloadRecord,
+  getQueueRowsByTrackId,
+  insertDownloadRecord
 } from '@/database/queries/downloadQueries';
 import {
   queueBatchDownload,
@@ -48,51 +50,58 @@ const DOWNLOAD_DIR = new Directory(Paths.document, 'HyperDownloads');
 /** Ensures native event listeners are attached exactly once to avoid memory leaks */
 let listenersInitialized = false;
 
+import { getGlobalDb } from '@/database/globalDb';
+
+async function getBgDatabase(): Promise<SQLiteDatabase> {
+  return getGlobalDb();
+}
+
 /** Tracks retry attempts for HTTP 403 auto-recovery loops to prevent infinite loops */
 const retryTrackers: Record<string, number> = {};
 
 /**
  * Initializes native event listeners for monitoring background download progress and state transitions.
- * Dynamically opens ephemeral SQLite connections to ensure robust background processing without stale state.
+ * Utilizes a singleton SQLite connection to ensure robust background processing without stale state.
  */
 function initNativeListeners(): void {
   if (listenersInitialized) return;
   listenersInitialized = true;
 
   addDownloadActionListener(async (event) => {
-    let db: SQLiteDatabase | null = null;
     try {
-      db = await SQLite.openDatabaseAsync('hypermusic.db', { useNewConnection: true } as any);
+      const db = await getBgDatabase();
       
       if (event.action === 'cancelBatch') {
         await downloadService.clearEntireQueue(db);
       } else if (event.action === 'pauseBatch') {
-        const store = useDownloadStore.getState();
-        const activeIds = Object.keys(store.activeDownloads);
-        for (const id of activeIds) {
-          pauseNativeDownload(id);
-        }
         await pauseAllPending(db);
         await downloadService._syncQueue(db);
+        useDownloadStore.getState().setAllActiveStatus('paused');
       } else if (event.action === 'resumeBatch') {
         await resumeAllPaused(db);
         await downloadService._syncQueue(db);
+        useDownloadStore.getState().setAllActiveStatus('queued');
       }
     } catch (e) {
       console.error('[DownloadService] Action listener error:', e);
-    } finally {
-      if (db) {
-        try { await db.closeAsync(); } catch (_) {}
-      }
     }
   });
 
   // Listen to native high-frequency progress updates
+  const progressThrottlers: Record<string, number> = {};
+  
   addDownloadProgressListener((event: DownloadProgressEvent) => {
     const { id, bytesWritten, totalBytes } = event;
-    const percent = totalBytes > 0 ? (bytesWritten / totalBytes) * 100 : 0;
-    const store = useDownloadStore.getState();
-    store.updateProgress(id, percent);
+    const now = Date.now();
+    const lastUpdate = progressThrottlers[id] || 0;
+    
+    // Throttle JS bridge updates to ~300ms to prevent React UI lag
+    if (now - lastUpdate > 300 || bytesWritten === totalBytes) {
+      progressThrottlers[id] = now;
+      const percent = totalBytes > 0 ? (bytesWritten / totalBytes) * 100 : 0;
+      const store = useDownloadStore.getState();
+      store.updateProgress(id, percent);
+    }
   });
 
   // Listen to state transitions
@@ -102,7 +111,7 @@ function initNativeListeners(): void {
     const activeDownload = store.activeDownloads[id];
 
     if (state === 'QUEUED') {
-      store.setDownloadStatus(id, 'paused');
+      store.setDownloadStatus(id, 'queued');
     } else if (state === 'DOWNLOADING') {
       store.setDownloadStatus(id, 'downloading');
     } else if (state === 'PAUSED') {
@@ -112,9 +121,8 @@ function initNativeListeners(): void {
       store.incrementBatchCompleted();
       if (activeDownload) {
         const track = activeDownload.track;
-        let db: SQLiteDatabase | null = null;
         try {
-          db = await SQLite.openDatabaseAsync('hypermusic.db', { useNewConnection: true } as any);
+          const db = await getBgDatabase();
           let fileSize = 0;
           if (finalUri) {
             const file = new File(finalUri);
@@ -128,10 +136,6 @@ function initNativeListeners(): void {
           await downloadService._syncQueue(db);
         } catch (e) {
           console.error(`[DownloadService] Failed to persist completed download to DB for ${id}`, e);
-        } finally {
-          if (db) {
-             try { await db.closeAsync(); } catch (_) {}
-          }
         }
         
         store.removeDownload(id);
@@ -167,20 +171,15 @@ function initNativeListeners(): void {
       console.error(`[DownloadService] Download failed for ${id}:`, error);
       store.setDownloadStatus(id, 'error');
 
-      let db: SQLiteDatabase | null = null;
       try {
-        db = await SQLite.openDatabaseAsync('hypermusic.db', { useNewConnection: true } as any);
+        const db = await getBgDatabase();
         // Mark as failed in queue so the conductor can move on
-        const queueRows = await db.getAllAsync<{ id: string }>(`SELECT id FROM DownloadQueue WHERE trackId = ?`, [id]);
+        const queueRows = await getQueueRowsByTrackId(db, id);
         for (const row of queueRows) {
           await updateQueueStatus(db, row.id, 'FAILED');
         }
       } catch (e) {
          console.error(`[DownloadService] Failed to update failed state in DB for ${id}`, e);
-      } finally {
-        if (db) {
-           try { await db.closeAsync(); } catch (_) {}
-        }
       }
     }
   });
@@ -315,7 +314,6 @@ export const downloadService = {
    * Gracefully cancels all pending batch downloads and wipes the entire queue.
    */
   clearEntireQueue: async (db: SQLiteDatabase): Promise<void> => {
-    cancelBatchNative();
     await clearEntireQueue(db);
     useDownloadStore.getState().clearActiveDownloads();
     useDownloadStore.getState().resetBatchMetrics();
@@ -337,14 +335,14 @@ export const downloadService = {
 
   pauseDownload: async (db: SQLiteDatabase, trackId: string): Promise<void> => {
     pauseNativeDownload(trackId);
-    const queueRows = await db.getAllAsync<{ id: string }>(`SELECT id FROM DownloadQueue WHERE trackId = ?`, [trackId]);
+    const queueRows = await getQueueRowsByTrackId(db, trackId);
     for (const row of queueRows) await updateQueueStatus(db, row.id, 'PAUSED');
   },
 
   resumeDownload: async (db: SQLiteDatabase, trackId: string): Promise<void> => {
     initNativeListeners();
     resumeNativeDownload(trackId, null);
-    const queueRows = await db.getAllAsync<{ id: string }>(`SELECT id FROM DownloadQueue WHERE trackId = ?`, [trackId]);
+    const queueRows = await getQueueRowsByTrackId(db, trackId);
     for (const row of queueRows) await updateQueueStatus(db, row.id, 'PENDING');
   },
 
@@ -370,7 +368,7 @@ export const downloadService = {
   cancelDownload: async (db: SQLiteDatabase, trackId: string): Promise<void> => {
     try {
       cancelNativeDownload(trackId);
-      const queueRows = await db.getAllAsync<{ id: string }>(`SELECT id FROM DownloadQueue WHERE trackId = ?`, [trackId]);
+      const queueRows = await getQueueRowsByTrackId(db, trackId);
       for (const row of queueRows) await removeFromQueue(db, row.id);
 
       const { audioFile: m4aFile, artFile } = downloadService.getLocalPaths(trackId, 'song');

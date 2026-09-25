@@ -7,9 +7,25 @@ import { upsertTrack } from './trackQueries';
  */
 export async function getAllPlaylists(db: SQLiteDatabase): Promise<any[]> {
   try {
-    return await db.getAllAsync(`SELECT * FROM Playlists ORDER BY createdAt DESC`);
+    return await db.getAllAsync(`SELECT * FROM Playlists ORDER BY COALESCE(updatedAt, createdAt) DESC`);
   } catch (error) {
     console.error('[playlistQueries] Error fetching playlists:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches all local user playlists, including a dynamic trackCount for each.
+ */
+export async function getAllPlaylistsWithTrackCount(db: SQLiteDatabase): Promise<any[]> {
+  try {
+    return await db.getAllAsync(`
+      SELECT p.*, (SELECT COUNT(*) FROM PlaylistTracks WHERE playlistId = p.id) as trackCount 
+      FROM Playlists p 
+      ORDER BY COALESCE(p.updatedAt, p.createdAt) DESC
+    `);
+  } catch (error) {
+    console.error('[playlistQueries] Error fetching playlists with track counts:', error);
     return [];
   }
 }
@@ -96,12 +112,16 @@ export async function addTrackToPlaylist(db: SQLiteDatabase, playlistId: string,
       [playlistId, track.id, nextOrderIndex]
     );
 
-    // Update the playlist's cover image if it doesn't have one
+    // Update the playlist's cover image if it doesn't have one, and update the updatedAt timestamp
     if (track.artworkUrl) {
       const playlist = await db.getFirstAsync<{ coverUrl: string | null }>(`SELECT coverUrl FROM Playlists WHERE id = ?`, [playlistId]);
       if (playlist && !playlist.coverUrl) {
-        await db.runAsync(`UPDATE Playlists SET coverUrl = ? WHERE id = ?`, [track.artworkUrl, playlistId]);
+        await db.runAsync(`UPDATE Playlists SET coverUrl = ?, updatedAt = ? WHERE id = ?`, [track.artworkUrl, Date.now(), playlistId]);
+      } else {
+        await db.runAsync(`UPDATE Playlists SET updatedAt = ? WHERE id = ?`, [Date.now(), playlistId]);
       }
+    } else {
+      await db.runAsync(`UPDATE Playlists SET updatedAt = ? WHERE id = ?`, [Date.now(), playlistId]);
     }
   } catch (error) {
     // Ignored: Track is likely already in the playlist (UNIQUE constraint failed)

@@ -11,6 +11,8 @@ export * from './HyperVideoView';
 
 export const HyperPlayer = NitroModules.createHybridObject<HyperPlayerSpec>('HyperPlayer');
 
+export type { WidgetPinRequestResult, WidgetStyle } from './specs/hyper-player.nitro';
+
 export type {
   HyperPlayerSpec,
   PlayerTrack,

@@ -5,13 +5,15 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
-import androidx.media3.datasource.cache.CacheDataSource
-import com.margelo.nitro.hyperplayer.cache.HyperCacheManager
 import com.margelo.nitro.hyperplayer.network.HyperDataSourceFactory
 import com.margelo.nitro.hyperplayer.session.HyperMediaSessionService
 import com.margelo.nitro.hyperplayer.utils.Logger
+import com.margelo.nitro.hyperplayer.widget.WidgetPlaybackSnapshot
+import com.margelo.nitro.hyperplayer.widget.WidgetPlaybackState
+import com.margelo.nitro.hyperplayer.widget.WidgetStateRepository
+import com.margelo.nitro.hyperplayer.widget.WidgetUpdateCoordinator
+import com.margelo.nitro.hyperplayer.widget.WidgetUpdateReason
 import kotlinx.coroutines.*
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * The core orchestrator of the audio engine. Ensures only one ExoPlayer exists across the entire app lifecycle.
@@ -68,6 +70,7 @@ object PlayerControllerSingleton {
         fun onPositionUpdate(positionMs: Double, durationMs: Double, bufferedMs: Double)
         fun onCustomCommand(command: String)
         fun onVideoAvailabilityChanged(hasVideo: Boolean)
+        fun onHistoryRecorded(trackId: String, title: String, artist: String, artworkUrl: String, trackType: String)
     }
 
     fun setEventListener(listener: PlayerEventListener) {
@@ -78,6 +81,32 @@ object PlayerControllerSingleton {
         eventListener?.onCustomCommand(command)
     }
 
+    private fun publishWidgetSnapshot(context: Context) {
+        val player = exoPlayer ?: return
+        val item = player.currentMediaItem
+        val metadata = item?.mediaMetadata
+        val artworkUri = metadata?.artworkUri?.toString()?.takeIf { it.isNotBlank() }
+        val snapshot = WidgetPlaybackSnapshot(
+            mediaId = item?.mediaId?.takeIf { it.isNotBlank() },
+            title = metadata?.title?.toString()?.takeIf { it.isNotBlank() }
+                ?: WidgetPlaybackSnapshot.NOT_PLAYING_TITLE,
+            artist = metadata?.artist?.toString().orEmpty(),
+            playbackState = when {
+                item == null || player.playbackState == Player.STATE_IDLE -> WidgetPlaybackState.IDLE
+                player.isPlaying -> WidgetPlaybackState.PLAYING
+                else -> WidgetPlaybackState.PAUSED
+            },
+            artworkUri = artworkUri,
+            artworkCacheKey = artworkUri?.let { "${item?.mediaId.orEmpty()}:$it" },
+        )
+
+        WidgetStateRepository.save(snapshot)
+        WidgetUpdateCoordinator.requestUpdate(
+            context.applicationContext,
+            WidgetUpdateReason.PLAYER_STATE_CHANGED,
+        )
+    }
+
     /**
      * Initializes and returns the ExoPlayer singleton instance.
      * Configures the data source factory chain (Network -> Cache -> JIT Resolver) and sets up
@@ -86,6 +115,11 @@ object PlayerControllerSingleton {
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun getPlayer(context: Context): ExoPlayer {
         if (exoPlayer == null) {
+
+            NativeHistoryTracker.setHistoryCallback { trackId, title, artist, artworkUrl, trackType ->
+                eventListener?.onHistoryRecorded(trackId, title, artist, artworkUrl, trackType)
+            }
+
             val resolvingDataSourceFactory = HyperDataSourceFactory.create(context)
 
             val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
@@ -136,6 +170,18 @@ object PlayerControllerSingleton {
                         // The track.id is embedded as the host in the hyper:// URI
                         val trackId = mediaItem?.localConfiguration?.uri?.host ?: ""
                         
+                        val typeParam = mediaItem?.mediaMetadata?.extras?.getString("trackType") ?: "song"
+
+                        NativeHistoryTracker.onTrackChanged(
+                            trackId = trackId,
+                            title = mediaItem?.mediaMetadata?.title?.toString() ?: "",
+                            artist = mediaItem?.mediaMetadata?.artist?.toString() ?: "",
+                            artworkUrl = mediaItem?.mediaMetadata?.artworkUri?.toString() ?: "",
+                            trackType = typeParam,
+                            duration = 0L,
+                            isPlaying = playWhenReady
+                        )
+                        
                         val index = currentMediaItemIndex
                         val reasonStr = when(reason) {
                             Player.MEDIA_ITEM_TRANSITION_REASON_AUTO -> "auto"
@@ -172,13 +218,22 @@ object PlayerControllerSingleton {
                                 preloadNextTrack(getMediaItemAt(nextIndex), context)
                             }
                         }
+                        
+                        publishWidgetSnapshot(context)
                     }
 
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         emitPlaybackState()
+                        publishWidgetSnapshot(context)
                         if (playbackState == Player.STATE_READY) {
                             consecutiveErrorCount = 0
+                            // Duration is no longer needed for history tracking
                         }
+                        
+                        NativeHistoryTracker.onPlaybackStateChanged(
+                            isPlaying = playbackState == Player.STATE_READY && playWhenReady
+                        )
+
                         if (playbackState == Player.STATE_READY && playWhenReady) {
                             startProgressLoop()
                         }
@@ -186,14 +241,25 @@ object PlayerControllerSingleton {
 
                     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                         emitPlaybackState()
+                        
+                        NativeHistoryTracker.onPlaybackStateChanged(
+                            isPlaying = playbackState == Player.STATE_READY && playWhenReady
+                        )
+                        
                         if (playbackState == Player.STATE_READY && playWhenReady) {
                             startProgressLoop()
                         }
+                        publishWidgetSnapshot(context)
+                    }
+
+                    override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
+                        publishWidgetSnapshot(context)
                     }
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                         Logger.e("ExoPlayer Error", error)
                         eventListener?.onPlaybackStateChange("error", false, isResolvingJit, currentQueueRevision)
+                        publishWidgetSnapshot(context)
                         
                         consecutiveErrorCount++
 
@@ -383,6 +449,7 @@ object PlayerControllerSingleton {
     }
 
     fun destroy() {
+        NativeHistoryTracker.release()
         exoPlayer?.release()
         exoPlayer = null
         scope.cancel()

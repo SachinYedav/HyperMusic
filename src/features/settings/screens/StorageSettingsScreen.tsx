@@ -5,7 +5,7 @@ import { AppConfirmSheet } from '@/ui/AppConfirmSheet';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '@/ui/Screen';
 import { SettingsSection, SettingsActionRow } from '@/features/settings/components/SettingsComponents';
-import { Trash2, ArrowLeft } from 'lucide-react-native';
+import { Trash2, ArrowLeft, Database, History } from 'lucide-react-native';
 import { formatBytes } from '@/utils/formatters';
 import { useStorageStats } from '@/features/settings/hooks/useStorageStats';
 import { useStorageActions } from '@/features/settings/hooks/useStorageActions';
@@ -97,12 +97,22 @@ export function StorageSettingsScreen() {
 
         <SettingsSection title="Free up space" colors={colors}>
           <SettingsActionRow
-            icon={Trash2}
+            icon={Database}
             label="Clear Cache"
             valueLabel={stats ? formatBytes(stats.cache) : ""}
             onPress={handleClearCache}
             colors={colors}
             isDark={isDark}
+            isSelector={true}
+          />
+          <SettingsActionRow
+            icon={History}
+            label="Clear Playback History"
+            valueLabel=""
+            onPress={handleClearHistory}
+            colors={colors}
+            isDark={isDark}
+            isSelector={true}
           />
           <SettingsActionRow
             icon={Trash2}
@@ -112,16 +122,8 @@ export function StorageSettingsScreen() {
             colors={colors}
             isDark={isDark}
             danger={true}
-          />
-          <SettingsActionRow
-            icon={Trash2}
-            label="Clear Playback History"
-            valueLabel=""
-            onPress={handleClearHistory}
-            colors={colors}
-            isDark={isDark}
-            danger={true}
             isLast={true}
+            isSelector={true}
           />
         </SettingsSection>
       </ScrollView>
@@ -142,15 +144,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   backButton: {
     padding: spacing.xs,
+    marginRight: spacing.md,
   },
   headerTitle: {
+    flex: 1,
     fontSize: typography.title,
     fontWeight: 'bold',
   },

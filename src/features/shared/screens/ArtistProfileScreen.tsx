@@ -14,7 +14,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Play, Shuffle, Share2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getColors } from 'react-native-image-colors';
+import { useImageColors } from '@/hooks/useImageColors';
 import { TrackResultCard } from '../../search/components/TrackResultCard';
 import { usePlayerStore } from '@/store';
 import { ExtractedTrack } from 'react-native-hyper-extractor';
@@ -44,7 +44,6 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
   const playTrack = usePlayerStore((state) => state.playTrack);
   const playList = usePlayerStore((state) => state.playList);
   const scrollY = useSharedValue(0);
-  const [dominantColor, setDominantColor] = useState<string>(colors.border);
   const db = useSafeDatabase();
   const [localTracks, setLocalTracks] = useState<ExtractedTrack[]>([]);
   const isSaved = useLibraryStore((state) => state.followedArtistIds.has(route.params.id));
@@ -83,21 +82,7 @@ export function ArtistProfileScreen({ navigation, route }: Props) {
   };
 
 
-  useEffect(() => {
-    if (artistData?.artworkUrl) {
-      getColors(artistData.artworkUrl, {
-        fallback: colors.border,
-        cache: true,
-        key: artistData.artworkUrl,
-      }).then((c) => {
-        if (c.platform === 'android') {
-          setDominantColor(c.dominant || dominantColor);
-        } else if (c.platform === 'ios') {
-          setDominantColor(c.primary || dominantColor);
-        }
-      });
-    }
-  }, [isDark, artistData?.artworkUrl]);
+  const { dominantColor } = useImageColors(artistData?.artworkUrl, { fallback: colors.border });
 
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;

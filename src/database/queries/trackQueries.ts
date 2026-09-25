@@ -79,6 +79,36 @@ export async function upsertTrack(db: SQLiteDatabase, track: ExtractedTrack) {
 }
 
 /**
+ * Synchronous version of upsertTrack, bypassing background async limits.
+ */
+export function upsertTrackSync(db: SQLiteDatabase, track: ExtractedTrack) {
+  const artwork = track.artworkUrl || (track as any).artwork || (track as any).coverUrl || (track as any).thumbnail || null;
+  const trackType = (track as any).trackType || (track as any).type || 'song';
+  db.runSync(
+    `INSERT INTO Tracks (id, title, artist, artistId, album, duration, artworkUrl, trackType)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+        title=excluded.title,
+        artist=excluded.artist,
+        artistId=excluded.artistId,
+        album=excluded.album,
+        duration=excluded.duration,
+        artworkUrl=excluded.artworkUrl,
+        trackType=COALESCE(excluded.trackType, trackType)`,
+    [
+      track.id,
+      track.title || 'Unknown',
+      track.artist || 'Unknown',
+      track.artistId || null,
+      null,
+      track.duration || 0,
+      artwork,
+      trackType,
+    ]
+  );
+}
+
+/**
  * Upserts the track, toggles the isLiked integer, and sets addedAt.
  */
 export async function toggleLike(db: SQLiteDatabase, track: ExtractedTrack) {

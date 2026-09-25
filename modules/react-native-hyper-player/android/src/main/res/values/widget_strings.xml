@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget Labels -->
+    <string name="widget_classic_label">Classic Player</string>
+    <string name="widget_pill_label">Pill</string>
+    <string name="widget_material_label">Material You</string>
+    <string name="widget_blur_label">Blurred Immersive</string>
+    <string name="widget_search_label">Search</string>
+
+    <!-- Widget Descriptions -->
+    <string name="widget_classic_desc">Standard player for daily listening</string>
+    <string name="widget_pill_desc">Space-saving mini player</string>
+    <string name="widget_material_desc">Immersive full-card album art</string>
+    <string name="widget_blur_desc">Elegant blurred background player</string>
+    <string name="widget_search_desc">Instant search and playback access</string>
+</resources>

@@ -146,6 +146,10 @@ dependencies {
 
   // JIT Extraction engine directly accessed via Kotlin
   implementation project(":react-native-hyper-extractor")
+
+  // Palette for Color Bleeding
+  implementation "androidx.palette:palette:1.0.0"
+
 }
 
 if (isNewArchitectureEnabled()) {

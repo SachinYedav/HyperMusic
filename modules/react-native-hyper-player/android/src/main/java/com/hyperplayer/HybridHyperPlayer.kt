@@ -7,7 +7,10 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.margelo.nitro.hyperplayer.HybridHyperPlayerSpec
 import com.margelo.nitro.hyperplayer.engine.PlayerControllerSingleton
 import com.margelo.nitro.hyperplayer.PlayerTrack
+import com.margelo.nitro.hyperplayer.WidgetPinRequestResult
+import com.margelo.nitro.hyperplayer.WidgetStyle
 import com.margelo.nitro.hyperplayer.utils.Logger
+import com.margelo.nitro.hyperplayer.widget.WidgetStyleRegistry
 
 /**
  * JSI Bridge component acting as the primary orchestration layer between the React Native JavaScript runtime
@@ -63,9 +66,13 @@ class HybridHyperPlayer : HybridHyperPlayerSpec(), PlayerControllerSingleton.Pla
             Logger.i("loadQueue invoked with ${tracks.size} tracks, startIndex: $startIndex, queueRevision: $queueRevision")
             ensurePlayerCreated()
             val mediaItems = tracks.map { track ->
+                val extrasBundle = android.os.Bundle().apply {
+                    putString("trackType", track.trackType ?: "song")
+                }
                 val metadataBuilder = MediaMetadata.Builder()
                     .setTitle(track.title)
                     .setArtist(track.artist)
+                    .setExtras(extrasBundle)
                 if (track.artworkUrl.isNotBlank()) {
                     metadataBuilder.setArtworkUri(android.net.Uri.parse(track.artworkUrl))
                 }
@@ -103,9 +110,13 @@ class HybridHyperPlayer : HybridHyperPlayerSpec(), PlayerControllerSingleton.Pla
         mainHandler.post {
             ensurePlayerCreated()
             val mediaItems = tracks.map { track ->
+                val extrasBundle = android.os.Bundle().apply {
+                    putString("trackType", track.trackType ?: "song")
+                }
                 val metadataBuilder = MediaMetadata.Builder()
                     .setTitle(track.title)
                     .setArtist(track.artist)
+                    .setExtras(extrasBundle)
                 if (track.artworkUrl.isNotBlank()) {
                     metadataBuilder.setArtworkUri(android.net.Uri.parse(track.artworkUrl))
                 }
@@ -270,8 +281,56 @@ class HybridHyperPlayer : HybridHyperPlayerSpec(), PlayerControllerSingleton.Pla
         emitEvent("onVideoAvailabilityChanged", data)
     }
 
+    override fun onHistoryRecorded(trackId: String, title: String, artist: String, artworkUrl: String, trackType: String) {
+        val data = com.facebook.react.bridge.Arguments.createMap().apply {
+            putString("trackId", trackId)
+            putString("title", title)
+            putString("artist", artist)
+            putString("artworkUrl", artworkUrl)
+            putString("trackType", trackType)
+        }
+        emitEvent("onHistoryRecorded", data)
+    }
+
     override fun setGlobalStreamingQuality(quality: String) {
         com.margelo.nitro.hyperplayer.network.JitDataSourceResolver.currentQuality = quality
         Logger.i("Global streaming quality updated to: $quality")
+    }
+
+    override fun requestPinWidget(style: WidgetStyle): WidgetPinRequestResult {
+        val context = globalReactContext?.applicationContext ?: return WidgetPinRequestResult.FAILED
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
+            return WidgetPinRequestResult.UNSUPPORTED
+        }
+
+        val appWidgetManager = android.appwidget.AppWidgetManager.getInstance(context)
+        if (!appWidgetManager.isRequestPinAppWidgetSupported) {
+            return WidgetPinRequestResult.UNSUPPORTED
+        }
+
+        return try {
+            val provider = WidgetStyleRegistry.providerComponent(context, style)
+            val successIntent = android.content.Intent(context, com.margelo.nitro.hyperplayer.widget.WidgetPinSuccessReceiver::class.java).apply {
+                action = com.margelo.nitro.hyperplayer.widget.WidgetPinSuccessReceiver.ACTION_PIN_SUCCESS
+                putExtra(com.margelo.nitro.hyperplayer.widget.WidgetPinSuccessReceiver.EXTRA_STYLE, style.name)
+            }
+            val successPendingIntent = android.app.PendingIntent.getBroadcast(
+                context,
+                style.ordinal,
+                successIntent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
+            )
+            val accepted = appWidgetManager.requestPinAppWidget(provider, null, successPendingIntent)
+            if (accepted) {
+                Logger.i("Started pin request for widget style: $style")
+                WidgetPinRequestResult.REQUESTSTARTED
+            } else {
+                Logger.e("Launcher rejected pin request for widget style: $style")
+                WidgetPinRequestResult.FAILED
+            }
+        } catch (error: Exception) {
+            Logger.e("Failed to request widget pinning for style: $style", error)
+            WidgetPinRequestResult.FAILED
+        }
     }
 }

@@ -1,9 +1,9 @@
 import React, { memo, useCallback } from 'react';
 import { View, Text, TouchableHighlight, TouchableOpacity, StyleSheet } from 'react-native';
-import { Image } from 'expo-image';
 import { Menu } from 'lucide-react-native';
 import { usePlayerStore } from '@/store';
 import { useActionSheetStore } from '@/store/useActionSheetStore';
+import { useToastStore } from '@/store/useToastStore';
 import { PremiumImage } from '@/ui/PremiumImage';
 import { AnimatedEQ } from '@/ui/AnimatedEQ';
 import { darkColors } from '@/theme/colors';
@@ -26,16 +26,22 @@ export const QueueItemComponent = memo(({ track, isPlayingItem, themeColors, dra
     <TouchableHighlight
       underlayColor={themeColors.brand + '18'}
       onPress={handlePress}
-      onLongPress={() => useActionSheetStore.getState().openSheet('track', track, { isQueueItem: true })}
+      onLongPress={() => {
+        if (track?.trackType?.startsWith('local_device')) {
+          useToastStore.getState().showToast('Not available for local files', 'info');
+          return;
+        }
+        useActionSheetStore.getState().openSheet('track', track, { isQueueItem: true });
+      }}
       disabled={isActive}
     >
       <View style={[styles.queueItem, isActive && { backgroundColor: themeColors.brand + '18' }]}>
         <View style={styles.queueArtContainer}>
-          <PremiumImage 
-            source={track.artwork} 
-            contextType="track" 
-            style={styles.queueArt} 
-            fallbackIconSize={20} 
+          <PremiumImage
+            source={track.artwork}
+            contextType="track"
+            style={styles.queueArt}
+            fallbackIconSize={20}
           />
           {isPlayingItem && <AnimatedEQ isOverlay />}
         </View>

@@ -228,6 +228,7 @@ export function CollectionDetailsTemplate({
         estimatedItemSize={60}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingTop: HEADER_MAX_HEIGHT,
           paddingBottom: insets.bottom + 100,

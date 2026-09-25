@@ -146,7 +146,10 @@ export const PlayerBottomSheet: React.FC = () => {
   }, [activeTrack, db, isDownloaded, activeDownloadState]);
 
   // --- Dynamic UI Hooks & Physics ---
-  const bgColor = usePlayerColors(activeTrack);
+  const playerPalette = usePlayerColors(activeTrack);
+  const bgColor = playerPalette.dominantColor;
+  const textContrastColor = playerPalette.textContrastColor;
+  const vibrantColor = playerPalette.vibrantColor;
 
   const layoutHeight = Math.max(containerHeight || screenHeight, 500); // Failsafe minimum height
   const bottomTabBarHeight = getBottomTabBarHeight(insets.bottom) || 0;
@@ -459,7 +462,7 @@ export const PlayerBottomSheet: React.FC = () => {
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.wrapper, bottomSheetStyle]} pointerEvents="box-none" onLayout={handleContainerLayout}>
         <Animated.View style={[styles.miniPlayerContainer, miniplayerStyle, { backgroundColor: bgColor }]}>
-          <MiniPlayerComponent onExpand={handleExpand} track={activeTrack} isPlaying={isPlaying} isLoading={isLoading} isResolving={isResolving} iconColor={darkColors.white} isVideoMode={isVideoMode} />
+          <MiniPlayerComponent onExpand={handleExpand} track={activeTrack} isPlaying={isPlaying} isLoading={isLoading} isResolving={isResolving} iconColor={textContrastColor} isVideoMode={isVideoMode} />
         </Animated.View>
 
         <Animated.View style={[styles.fullscreenContainer, fullscreenStyle]}>
@@ -474,7 +477,7 @@ export const PlayerBottomSheet: React.FC = () => {
           </Animated.View>
 
           <Animated.View style={[styles.topBar, { paddingTop: insets.top + 8 }, topBarStyle]}>
-            <TopBarComponent onCollapse={handleCollapse} activeTrack={activeTrack} isVideoMode={isVideoMode} setIsVideoMode={setIsVideoMode} />
+            <TopBarComponent onCollapse={handleCollapse} activeTrack={activeTrack} isVideoMode={isVideoMode} setIsVideoMode={setIsVideoMode} iconColor={textContrastColor} />
           </Animated.View>
 
           <FullscreenArtworkComponent
@@ -486,7 +489,13 @@ export const PlayerBottomSheet: React.FC = () => {
               if (isPlaying) usePlayerStore.getState().pause();
               else usePlayerStore.getState().resume();
             }}
-            onOpenMenu={() => useActionSheetStore.getState().openSheet('track', activeTrack!, { isCurrentlyPlaying: true, isQueueItem: true })}
+            onOpenMenu={() => {
+              if (activeTrack?.trackType?.startsWith('local_device')) {
+                useToastStore.getState().showToast('Not available for local files', 'info');
+                return;
+              }
+              useActionSheetStore.getState().openSheet('track', activeTrack!, { isCurrentlyPlaying: true, isQueueItem: true });
+            }}
             styles={styles}
             darkColors={darkColors}
             artworkStyle={artworkStyle}
@@ -495,9 +504,11 @@ export const PlayerBottomSheet: React.FC = () => {
             titleAnimatedStyle={titleAnimatedStyle}
             artistAnimatedStyle={artistAnimatedStyle}
             state3ButtonsStyle={state3ButtonsStyle}
+            textContrastColor={textContrastColor}
+            vibrantColor={vibrantColor}
           />
 
-          <View style={[styles.flexBottomSpacer, { paddingBottom: QUEUE_COLLAPSED_VISIBLE_HEIGHT + insets.bottom + 45 }]}>
+          <View style={[styles.flexBottomSpacer, { paddingBottom: QUEUE_COLLAPSED_VISIBLE_HEIGHT + (screenHeight < 780 ? 20 : 45) }]}>
             <Animated.View style={chipsDisappearingStyle}>
               <ActionChipsComponent
                 activeTrack={activeTrack}
@@ -511,7 +522,7 @@ export const PlayerBottomSheet: React.FC = () => {
             </Animated.View>
 
             <Animated.View style={playbackDisappearingStyle}>
-              <PlaybackControlsComponent isPlaying={isPlaying} isLoading={isLoading} isResolving={isResolving} brandColor={themeColors.brand} />
+              <PlaybackControlsComponent isPlaying={isPlaying} isLoading={isLoading} isResolving={isResolving} brandColor={vibrantColor} />
             </Animated.View>
           </View>
 
@@ -526,7 +537,7 @@ export const PlayerBottomSheet: React.FC = () => {
 
             <GestureDetector gesture={queuePanGesture}>
               <View style={styles.queueHeader}>
-                <QueueHeaderComponent onToggleQueue={handleToggleQueue} queueProgress={queueProgress} brandColor={themeColors.brand} />
+                <QueueHeaderComponent onToggleQueue={handleToggleQueue} queueProgress={queueProgress} brandColor={themeColors.brand} textContrastColor={textContrastColor} />
               </View>
             </GestureDetector>
 

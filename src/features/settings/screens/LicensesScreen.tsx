@@ -24,10 +24,10 @@ export function LicensesScreen() {
     <Screen disableSafeAreaBottom>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft color={colors.text} size={24} />
+          <ArrowLeft color={colors.text} size={28} />
         </TouchableOpacity>
         <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>Open Source</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Open Source</Text>
           <Text style={styles.headerSubtitle}>
             {totalCount} packages · {gplCount} GPL
           </Text>
@@ -67,7 +67,6 @@ const getStyles = (colors: any) =>
     headerTitle: {
       fontSize: typography.title,
       fontWeight: 'bold',
-      color: colors.text,
     },
     headerSubtitle: {
       fontSize: typography.caption,

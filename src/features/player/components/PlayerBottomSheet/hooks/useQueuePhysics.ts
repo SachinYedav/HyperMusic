@@ -11,7 +11,7 @@ export const useQueuePhysics = ({
   insets: any;
   QUEUE_COLLAPSED_VISIBLE_HEIGHT: number;
 }) => {
-  const QUEUE_COLLAPSED_Y = Math.max(layoutHeight - insets.bottom - QUEUE_COLLAPSED_VISIBLE_HEIGHT, 200);
+  const QUEUE_COLLAPSED_Y = Math.max(layoutHeight - QUEUE_COLLAPSED_VISIBLE_HEIGHT, 200);
   const QUEUE_HALF_Y = layoutHeight * 0.60;
   const QUEUE_EXPANDED_Y = insets.top + 70;
   const SAFE_DENOM_QUEUE = Math.max(QUEUE_COLLAPSED_Y - QUEUE_EXPANDED_Y, 1);

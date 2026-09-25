@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, spacing, typography } from '@/theme';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '@/navigation/types';
-import { getColors } from 'react-native-image-colors';
+import { useImageColors } from '@/hooks/useImageColors';
 import { TrackResultCard } from '../../search/components/TrackResultCard';
 import { usePlayerStore } from '@/store';
 import { useQuery } from '@tanstack/react-query';
@@ -25,7 +25,6 @@ export function PlaylistDetailsScreen({ navigation, route }: Props) {
   const db = useSafeDatabase();
   const isLocal = route.params.id.startsWith('playlist_') || route.params.id.startsWith('default_playlist_');
   const isSaved = useLibraryStore((state) => state.savedPlaylistIds.has(route.params.id));
-  const [dominantColor, setDominantColor] = useState<string>(colors.border);
 
   const { data: playlistData, isLoading, error, refetch } = useQuery({
     queryKey: ['playlist', route.params.id, !!db],
@@ -55,21 +54,7 @@ export function PlaylistDetailsScreen({ navigation, route }: Props) {
     enabled: (isLocal || isSaved) ? !!db : true,
   });
 
-  useEffect(() => {
-    if (playlistData?.artworkUrl) {
-      getColors(playlistData.artworkUrl, {
-        fallback: colors.border,
-        cache: true,
-        key: playlistData.artworkUrl,
-      }).then((c) => {
-        if (c.platform === 'android') {
-          setDominantColor(c.dominant || dominantColor);
-        } else if (c.platform === 'ios') {
-          setDominantColor(c.primary || dominantColor);
-        }
-      });
-    }
-  }, [isDark, playlistData?.artworkUrl]);
+  const { dominantColor } = useImageColors(playlistData?.artworkUrl, { fallback: colors.border });
 
   const optimisticData = {
     title: playlistData?.title || route.params.name || 'Loading...',

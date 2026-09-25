@@ -1,63 +1,39 @@
 import { useState, useEffect } from 'react';
-import { AppState } from 'react-native';
-import { getColors } from 'react-native-image-colors';
-import { usePlayerStore } from '../../../store/usePlayerStore';
 import { Track } from '@/types';
+import { useImageColors, ImagePalette } from '@/hooks/useImageColors';
+import { usePlayerStore } from '../../../store/usePlayerStore';
 
 const PLAYER_FALLBACK_BG = '#121212';
+const FALLBACK_PALETTE: ImagePalette = {
+  dominantColor: PLAYER_FALLBACK_BG,
+  vibrantColor: PLAYER_FALLBACK_BG,
+  darkVibrantColor: PLAYER_FALLBACK_BG,
+  mutedColor: PLAYER_FALLBACK_BG,
+  darkMutedColor: PLAYER_FALLBACK_BG,
+  textContrastColor: '#FFFFFF',
+};
 
-export const usePlayerColors = (activeTrack: Track | null) => {
-  const [bgColor, setBgColor] = useState<string>(PLAYER_FALLBACK_BG);
+export const usePlayerColors = (activeTrack: Track | null): ImagePalette => {
+  const trackId = activeTrack?.id;
+  const cachedPalette = trackId ? usePlayerStore.getState().colorCache[trackId] : undefined;
+
+  const [palette, setPalette] = useState<ImagePalette>(cachedPalette || FALLBACK_PALETTE);
+
+  const extractedPalette = useImageColors(!cachedPalette ? activeTrack?.artwork : null, {
+    fallback: PLAYER_FALLBACK_BG,
+    cache: false,
+  });
 
   useEffect(() => {
-    const art = activeTrack?.artwork;
-    const trackId = activeTrack?.id;
-    if (!art || !trackId) {
-      setBgColor(PLAYER_FALLBACK_BG);
-      return;
+    if (cachedPalette) {
+      setPalette(cachedPalette);
+    } else if (extractedPalette.dominantColor !== PLAYER_FALLBACK_BG && trackId) {
+      setPalette(extractedPalette);
+      usePlayerStore.getState().setColorCache(trackId, extractedPalette);
+    } else {
+      setPalette(extractedPalette);
     }
+  }, [extractedPalette, cachedPalette, trackId]);
 
-    // 1. Instant Cache Retrieval
-    const cachedColor = usePlayerStore.getState().colorCache[trackId];
-    if (cachedColor) {
-      setBgColor(cachedColor);
-      return;
-    }
-
-    // 2. AppState De-bouncing
-    if (AppState.currentState === 'background') {
-      return;
-    }
-
-    const fetchColors = async () => {
-      try {
-        const result = await getColors(art, {
-          fallback: PLAYER_FALLBACK_BG,
-          cache: true,
-          key: art,
-        });
-        
-        let extractedColor: string = PLAYER_FALLBACK_BG;
-        if (result.platform === 'android') extractedColor = result.average || PLAYER_FALLBACK_BG;
-        else if (result.platform === 'ios') extractedColor = result.background || PLAYER_FALLBACK_BG;
-        else extractedColor = result.dominant || PLAYER_FALLBACK_BG;
-
-        setBgColor(extractedColor);
-        usePlayerStore.getState().setColorCache(trackId, extractedColor);
-      } catch (e) {
-        setBgColor(PLAYER_FALLBACK_BG);
-      }
-    };
-
-    const scheduleIdle = window.requestIdleCallback || ((cb: any) => setTimeout(cb, 0));
-    const cancelIdle = window.cancelIdleCallback || ((id: any) => clearTimeout(id));
-
-    const handle = scheduleIdle(() => {
-      fetchColors();
-    });
-
-    return () => cancelIdle(handle);
-  }, [activeTrack?.artwork, activeTrack?.id]);
-
-  return bgColor;
+  return palette;
 };

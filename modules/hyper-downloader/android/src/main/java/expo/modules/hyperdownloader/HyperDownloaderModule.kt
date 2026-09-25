@@ -34,7 +34,7 @@ class HyperDownloaderModule : Module(), DownloadEventListener {
         }
 
         // Accept an array of track dictionaries to orchestrate the entire batch natively
-        Function("queueBatch") { tracks: List<Map<String, Any?>> ->
+        AsyncFunction("queueBatch") { tracks: List<Map<String, Any?>> ->
             val tasks = tracks.map { track ->
                 DownloadTask(
                     id = track["id"] as String,
@@ -50,32 +50,7 @@ class HyperDownloaderModule : Module(), DownloadEventListener {
             DownloadManager.queueBatch(tasks)
         }
 
-        Function("updateBatchProgress") { title: String, progressText: String, subtext: String?, artworkUrl: String?, progress: Int, max: Int, isPaused: Boolean ->
-            val ctx = appContext.reactContext
-            if (ctx != null) {
-                val intent = Intent(ctx, DownloadService::class.java).apply {
-                    action = DownloadService.ACTION_UPDATE
-                    putExtra(DownloadService.EXTRA_TITLE, title)
-                    putExtra(DownloadService.EXTRA_PROGRESS, progressText)
-                    if (subtext != null) putExtra(DownloadService.EXTRA_SUBTEXT, subtext)
-                    putExtra(DownloadService.EXTRA_ARTWORK, artworkUrl)
-                    putExtra(DownloadService.EXTRA_MAX_INT, max)
-                    putExtra(DownloadService.EXTRA_PROGRESS_INT, progress)
-                    putExtra(DownloadService.EXTRA_IS_PAUSED, isPaused)
-                }
-                ctx.startService(intent)
-            }
-        }
 
-        Function("clearBatchProgress") {
-            val ctx = appContext.reactContext
-            if (ctx != null) {
-                val intent = Intent(ctx, DownloadService::class.java).apply {
-                    action = DownloadService.ACTION_STOP
-                }
-                ctx.startService(intent)
-            }
-        }
 
         Function("pauseDownload") { id: String ->
             DownloadManager.pauseDownload(id)
@@ -89,15 +64,15 @@ class HyperDownloaderModule : Module(), DownloadEventListener {
             DownloadManager.cancelDownload(id)
         }
         
-        Function("pauseBatch") {
+        AsyncFunction("pauseBatch") {
             DownloadManager.pauseBatch()
         }
         
-        Function("resumeBatch") {
+        AsyncFunction("resumeBatch") {
             DownloadManager.resumeBatch()
         }
         
-        Function("cancelBatch") {
+        AsyncFunction("cancelBatch") {
             DownloadManager.cancelBatch()
         }
         
@@ -127,5 +102,9 @@ class HyperDownloaderModule : Module(), DownloadEventListener {
         task.finalUri?.let { map["finalUri"] = it }
         task.artworkUri?.let { map["artworkUri"] = it }
         this@HyperDownloaderModule.sendEvent("onDownloadStateChanged", map)
+    }
+
+    override fun onAction(action: String) {
+        this@HyperDownloaderModule.sendEvent("onDownloadAction", mapOf("action" to action))
     }
 }

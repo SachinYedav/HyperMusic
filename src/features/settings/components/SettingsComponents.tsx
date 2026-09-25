@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
-import { ChevronRight, Check } from 'lucide-react-native';
+import { ChevronRight, Check, ExternalLink, ChevronDown } from 'lucide-react-native';
 import { spacing, radius, typography } from '@/theme';
 
 export const SettingsSection = ({ title, children, colors }: any) => (
@@ -29,7 +29,7 @@ export const SettingsSwitchRow = ({ icon: Icon, label, value, onValueChange, isL
   </View>
 );
 
-export const SettingsActionRow = ({ icon: Icon, label, valueLabel, description, onPress, isLast, colors, isDark, danger, success, hideChevron }: any) => {
+export const SettingsActionRow = ({ icon: Icon, label, valueLabel, description, onPress, isLast, colors, isDark, danger, success, hideChevron, isExternal, isSelector }: any) => {
   const textColor = success ? '#4CAF50' : (danger ? colors.brand : colors.text);
   return (
     <TouchableOpacity
@@ -46,9 +46,13 @@ export const SettingsActionRow = ({ icon: Icon, label, valueLabel, description, 
           <Text style={[styles.optionDescription, { color: colors.textMuted }]}>{description}</Text>
         )}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {valueLabel ? <Text style={{ color: colors.textMuted, marginRight: hideChevron ? 0 : 8 }}>{valueLabel}</Text> : null}
-        {!hideChevron && <ChevronRight color={colors.textMuted} size={16} />}
+      <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1, maxWidth: '60%', justifyContent: 'flex-end' }}>
+        {valueLabel ? <Text style={{ color: colors.textMuted, marginRight: hideChevron ? 0 : 8, flexShrink: 1, textAlign: 'right' }}>{valueLabel}</Text> : null}
+        {!hideChevron && (
+          isExternal ? <ExternalLink color={colors.textMuted} size={16} /> :
+            isSelector ? <ChevronDown color={colors.textMuted} size={16} /> :
+              <ChevronRight color={colors.textMuted} size={16} />
+        )}
       </View>
     </TouchableOpacity>
   );

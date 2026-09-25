@@ -12,6 +12,15 @@ config.watchFolders = [
   path.resolve(projectRoot, 'modules'),
 ];
 
+// Exclude native build directories from Metro watcher to prevent ENOSPC/Timeout errors
+const customBlockList = [
+  /.*\/modules\/.*\/android\/.*/,
+  /.*\/modules\/.*\/ios\/.*/,
+];
+config.resolver.blockList = config.resolver.blockList
+  ? (Array.isArray(config.resolver.blockList) ? [...config.resolver.blockList, ...customBlockList] : [config.resolver.blockList, ...customBlockList])
+  : customBlockList;
+
 // Ensure Metro strictly resolves through the root node_modules to properly handle Workspace symlinks
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),

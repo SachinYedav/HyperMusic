@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronRight, User } from 'lucide-react-native';
 import { AppBottomSheet } from '@/ui/AppBottomSheet';
 import { useArtistSelectionStore } from '@/store/useArtistSelectionStore';
+import { usePlayerStore } from '@/store';
 import { useTheme, spacing, typography, radius } from '@/theme';
 
 export function ArtistSelectionSheet() {
@@ -15,6 +16,7 @@ export function ArtistSelectionSheet() {
   const handleSelectArtist = (artistId: string, artistName: string) => {
     closeSheet();
     setTimeout(() => {
+      usePlayerStore.getState().collapsePlayer();
       navigation.navigate('ArtistProfile', {
         id: artistId,
         artistName: artistName,

@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 import { DownloadTask, DownloadPauseState } from 'expo-file-system';
 import { ExtractedTrack } from 'react-native-hyper-extractor';
-import * as SQLite from 'expo-sqlite';
+import { getGlobalDb } from '@/database/globalDb';
 
 interface ActiveDownload {
   trackId: string;
   track: ExtractedTrack;
   progress: number;
-  status: 'downloading' | 'paused' | 'error';
+  status: 'downloading' | 'paused' | 'queued' | 'error';
   task?: DownloadTask;
   pauseState?: DownloadPauseState;
 }
@@ -22,7 +22,8 @@ interface DownloadState {
   // Actions
   addDownload: (track: ExtractedTrack, task: DownloadTask) => void;
   updateProgress: (trackId: string, progress: number) => void;
-  setDownloadStatus: (trackId: string, status: 'downloading' | 'paused' | 'error') => void;
+  setDownloadStatus: (trackId: string, status: 'downloading' | 'paused' | 'queued' | 'error') => void;
+  setAllActiveStatus: (status: 'downloading' | 'paused' | 'queued' | 'error') => void;
   setPauseState: (trackId: string, state: DownloadPauseState) => void;
   removeDownload: (trackId: string) => void;
   clearActiveDownloads: () => void;
@@ -51,7 +52,7 @@ export const useDownloadStore = create<DownloadState>((set) => ({
         trackId: track.id,
         track,
         progress: 0,
-        status: 'downloading',
+        status: 'queued',
         task
       }
     }
@@ -69,15 +70,24 @@ export const useDownloadStore = create<DownloadState>((set) => ({
   }),
   
   setDownloadStatus: (trackId, status) => set((state) => {
-    const download = state.activeDownloads[trackId];
-    if (!download) return state;
-    return {
-      activeDownloads: {
-        ...state.activeDownloads,
-        [trackId]: { ...download, status }
-      }
-    };
+    const active = state.activeDownloads[trackId];
+    if (!active) return state;
+    const newActive = { ...state.activeDownloads };
+    newActive[trackId] = { ...active, status };
+    return { activeDownloads: newActive };
   }),
+
+  setAllActiveStatus: (status) => {
+    set((state) => {
+      const newActive = { ...state.activeDownloads };
+      for (const id in newActive) {
+        if (newActive[id]) {
+          newActive[id] = { ...newActive[id], status };
+        }
+      }
+      return { activeDownloads: newActive };
+    });
+  },
 
   setPauseState: (trackId, pauseState) => set((state) => {
     const download = state.activeDownloads[trackId];
@@ -102,7 +112,8 @@ export const useDownloadStore = create<DownloadState>((set) => ({
 
   loadCompletedDownloads: async () => {
     try {
-      const db = SQLite.openDatabaseSync('hypermusic.db', { useNewConnection: true } as any);
+      const db = getGlobalDb();
+      
       const rows = await db.getAllAsync<{ trackId: string, localFilePath: string }>(
         'SELECT d.trackId, t.localFilePath FROM Downloads d INNER JOIN Tracks t ON d.trackId = t.id'
       );
@@ -111,7 +122,6 @@ export const useDownloadStore = create<DownloadState>((set) => ({
         if (row.localFilePath) completed[row.trackId] = row.localFilePath;
       });
       set({ completedDownloads: completed });
-      db.closeSync();
     } catch (e) {
       console.warn('Failed to load completed downloads:', e);
     }

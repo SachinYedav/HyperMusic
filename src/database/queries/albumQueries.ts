@@ -6,9 +6,25 @@ import { ExtractedTrack } from 'react-native-hyper-extractor';
  */
 export async function getAllAlbums(db: SQLiteDatabase): Promise<any[]> {
   try {
-    return await db.getAllAsync(`SELECT * FROM Albums ORDER BY createdAt DESC`);
+    return await db.getAllAsync(`SELECT * FROM Albums ORDER BY COALESCE(updatedAt, createdAt) DESC`);
   } catch (error) {
     console.error('[albumQueries] Error fetching albums:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches all local user albums, including a dynamic trackCount for each.
+ */
+export async function getAllAlbumsWithTrackCount(db: SQLiteDatabase): Promise<any[]> {
+  try {
+    return await db.getAllAsync(`
+      SELECT a.*, (SELECT COUNT(*) FROM AlbumTracks WHERE albumId = a.id) as trackCount 
+      FROM Albums a 
+      ORDER BY COALESCE(a.updatedAt, a.createdAt) DESC
+    `);
+  } catch (error) {
+    console.error('[albumQueries] Error fetching albums with track counts:', error);
     return [];
   }
 }

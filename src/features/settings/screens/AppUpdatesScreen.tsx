@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '@/ui/Screen';
 import { useTheme, typography, spacing, radius } from '@/theme';
-import { ArrowLeft, RefreshCw, DownloadCloud, Info, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react-native';
+import { ArrowLeft, RefreshCw, DownloadCloud, Info, ChevronRight, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react-native';
 import Constants from 'expo-constants';
 import { updateService, AppUpdateData } from '@/services/api/updateService';
 
@@ -43,7 +43,7 @@ export function AppUpdatesScreen() {
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
   const currentVersion = Constants.expoConfig?.version || '1.1.0';
-  
+
   const [isChecking, setIsChecking] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState<boolean | null>(null);
   const [updateChecked, setUpdateChecked] = useState(false);
@@ -51,11 +51,12 @@ export function AppUpdatesScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleCheckUpdates = async () => {
+    if (isChecking) return;
     setIsChecking(true);
     setUpdateAvailable(null);
     setUpdateChecked(false);
     setErrorMsg(null);
-    
+
     const response = await updateService.checkForUpdates();
     setIsChecking(false);
     setUpdateChecked(true);
@@ -72,6 +73,11 @@ export function AppUpdatesScreen() {
     }
   };
 
+  useEffect(() => {
+    handleCheckUpdates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleDownload = () => {
     if (updateData?.downloadUrl) {
       Linking.openURL(updateData.downloadUrl).catch(err => {
@@ -83,14 +89,14 @@ export function AppUpdatesScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-          <ArrowLeft color={colors.text} size={24} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft color={colors.text} size={28} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>App Updates</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        
+
         <SettingsSection title="Version Info" colors={colors}>
           <SettingsActionRow
             icon={Info}
@@ -99,88 +105,86 @@ export function AppUpdatesScreen() {
             colors={colors}
             isDark={isDark}
             hideChevron={true}
-            isLast={!updateAvailable && !updateChecked}
+            isLast={true}
           />
-          {updateAvailable && updateData && (
-             <SettingsActionRow
-               icon={DownloadCloud}
-               label="Latest Version"
-               valueLabel={updateData.latestVersion}
-               colors={colors}
-               isDark={isDark}
-               hideChevron={true}
-               isLast={true}
-             />
-          )}
         </SettingsSection>
+
+        {updateAvailable && updateData && (
+          <View style={[styles.updateBanner, { backgroundColor: colors.surface }]}>
+            <View style={styles.bannerIconContainer}>
+              <View style={[styles.bannerIconCircle, { backgroundColor: colors.brandMuted }]}>
+                <DownloadCloud color={colors.brand} size={32} />
+              </View>
+            </View>
+            <View style={styles.bannerTextContainer}>
+              <Text style={[styles.bannerTitle, { color: colors.text }]}>Update Available!</Text>
+              <Text style={[styles.bannerSubtitle, { color: colors.textMuted }]}>Version {updateData.latestVersion} is ready to download.</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: colors.brand }]}
+              onPress={handleDownload}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.primaryButtonText, { color: colors.white }]}>Download Update</Text>
+              <ExternalLink color={colors.white} size={18} style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {(!updateAvailable && !updateChecked) && (
           <SettingsSection colors={colors}>
-             <SettingsActionRow
-               icon={RefreshCw}
-               label={isChecking ? "Checking for updates..." : "Check for Updates"}
-               onPress={handleCheckUpdates}
-               colors={colors}
-               isDark={isDark}
-               hideChevron={true}
-               isLast={true}
-               loading={isChecking}
-             />
+            <SettingsActionRow
+              icon={RefreshCw}
+              label={isChecking ? "Checking for updates..." : "Check for Updates"}
+              onPress={handleCheckUpdates}
+              colors={colors}
+              isDark={isDark}
+              hideChevron={true}
+              isLast={true}
+              loading={isChecking}
+            />
           </SettingsSection>
         )}
 
         {updateChecked && updateAvailable === false && !errorMsg && (
           <SettingsSection colors={colors}>
-             <SettingsActionRow
-               icon={CheckCircle2}
-               label="App is Up to Date"
-               colors={colors}
-               isDark={isDark}
-               hideChevron={true}
-               isLast={true}
-             />
+            <SettingsActionRow
+              icon={CheckCircle2}
+              label="App is Up to Date"
+              colors={colors}
+              isDark={isDark}
+              hideChevron={true}
+              isLast={true}
+            />
           </SettingsSection>
         )}
 
         {errorMsg && (
           <SettingsSection colors={colors}>
-             <SettingsActionRow
-               icon={AlertCircle}
-               label={errorMsg}
-               colors={colors}
-               isDark={isDark}
-               hideChevron={true}
-               isLast={true}
-               danger={true}
-             />
+            <SettingsActionRow
+              icon={AlertCircle}
+              label={errorMsg}
+              colors={colors}
+              isDark={isDark}
+              hideChevron={true}
+              isLast={true}
+              danger={true}
+            />
           </SettingsSection>
         )}
 
         {updateAvailable && updateData && (
-          <>
-            <SettingsSection title={`What's New in v${updateData.latestVersion}`} colors={colors}>
-              <View style={styles.changelogWrapper}>
-                {updateData.changelog.map((item, i: number) => (
-                  <View key={i} style={[styles.changelogBullet, i === updateData.changelog.length - 1 && { marginBottom: 0 }]}>
-                    <View style={[styles.bulletDot, { backgroundColor: colors.textMuted }]} />
-                    <Text style={[styles.changelogText, { color: colors.text }]}>{item.text}</Text>
-                  </View>
-                ))}
-              </View>
-            </SettingsSection>
-
-            <SettingsSection colors={colors}>
-               <SettingsActionRow
-                 icon={DownloadCloud}
-                 label="Download Update"
-                 onPress={handleDownload}
-                 colors={colors}
-                 isDark={isDark}
-                 hideChevron={true}
-                 isLast={true}
-               />
-            </SettingsSection>
-          </>
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{`What's New in v${updateData.latestVersion}`}</Text>
+            <View style={{ paddingHorizontal: spacing.xs, marginTop: spacing.sm }}>
+              {updateData.changelog.map((item, i: number) => (
+                <View key={i} style={[styles.changelogBullet, i === updateData.changelog.length - 1 && { marginBottom: 0 }]}>
+                  <View style={[styles.bulletDot, { backgroundColor: colors.textMuted }]} />
+                  <Text style={[styles.changelogText, { color: colors.text }]}>{item.text}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
         )}
 
       </ScrollView>
@@ -194,12 +198,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    marginBottom: spacing.md,
   },
-  backBtn: {
+  backButton: {
+    padding: spacing.xs,
     marginRight: spacing.md,
   },
   headerTitle: {
+    flex: 1,
     fontSize: typography.title,
     fontWeight: 'bold',
   },
@@ -256,5 +261,47 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.body,
     lineHeight: 22,
+  },
+  updateBanner: {
+    padding: spacing.xl,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  bannerIconContainer: {
+    marginBottom: spacing.md,
+  },
+  bannerIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerTextContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  bannerTitle: {
+    fontSize: typography.title,
+    fontWeight: 'bold',
+    marginBottom: spacing.xs,
+  },
+  bannerSubtitle: {
+    fontSize: typography.body,
+    textAlign: 'center',
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.full,
+    width: '100%',
+  },
+  primaryButtonText: {
+    fontSize: typography.body,
+    fontWeight: 'bold',
   },
 });

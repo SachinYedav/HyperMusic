@@ -7,7 +7,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
-import android.util.Log
+
 import com.margelo.nitro.hyperextractor.engine.YouTubeMusicEngine
 import expo.modules.hyperdownloader.DownloadService
 import expo.modules.hyperdownloader.models.DownloadState
@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit
 interface DownloadEventListener {
     fun onProgress(id: String, bytesWritten: Long, totalBytes: Long)
     fun onStateChanged(task: DownloadTask)
+    fun onAction(action: String)
 }
 
 /**
@@ -155,6 +156,7 @@ object DownloadManager {
                 DownloadLogger.w("Skipped queueing ${task.id} because it already exists")
             }
         }
+        updateNativeNotification()
         processNextInQueue()
     }
 
@@ -227,9 +229,14 @@ object DownloadManager {
         isBatchPaused = true
         for ((id, task) in tasks) {
             if (task.state == DownloadState.DOWNLOADING || task.state == DownloadState.QUEUED) {
-                pauseDownload(id)
+                task.state = DownloadState.PAUSED
+                activeCalls[id]?.cancel()
+                activeJobs[id]?.cancel()
+                activeCalls.remove(id)
+                activeJobs.remove(id)
             }
         }
+        listener?.onAction("pauseBatch")
     }
     
     /**
@@ -242,9 +249,9 @@ object DownloadManager {
             if (task.state == DownloadState.PAUSED && !pendingQueue.contains(task) && !activeJobs.containsKey(task.id)) {
                 task.state = DownloadState.QUEUED
                 pendingQueue.add(task)
-                listener?.onStateChanged(task)
             }
         }
+        listener?.onAction("resumeBatch")
         processNextInQueue()
     }
     
@@ -256,8 +263,22 @@ object DownloadManager {
         pendingQueue.clear()
         val activeIds = tasks.keys.toList()
         for (id in activeIds) {
-            cancelDownload(id)
+            val task = tasks[id] ?: continue
+            task.state = DownloadState.FAILED
+            task.error = "Cancelled by user"
+            activeCalls[id]?.cancel()
+            activeJobs[id]?.cancel()
+            activeCalls.remove(id)
+            activeJobs.remove(id)
+            
+            val targetFile = getTargetFile(task.fileName)
+            val tempFile = File(targetFile.absolutePath + ".tmp")
+            if (targetFile.exists()) targetFile.delete()
+            if (tempFile.exists()) tempFile.delete()
         }
+        tasks.clear()
+        listener?.onAction("cancelBatch")
+        checkAndStopServiceIfEmpty()
     }
 
     /**
@@ -278,38 +299,40 @@ object DownloadManager {
     private fun processNextInQueue() {
         if (isBatchPaused) return
 
-        while (activeJobs.size < MAX_CONCURRENT_DOWNLOADS) {
-            val task = pendingQueue.poll() ?: break
-            
-            val job = scope.launch {
-                try {
-                    executeDownload(task)
-                } catch (e: CancellationException) {
-                    // Task cleanly cancelled via Coroutine Job
-                } catch (e: java.io.IOException) {
-                    if (task.state == DownloadState.DOWNLOADING) {
-                        DownloadLogger.w("Network drop or connection reset for ${task.id}, auto-pausing. (${e.message})")
-                        task.state = DownloadState.PAUSED
-                        listener?.onStateChanged(task)
+        synchronized(this) {
+            while (activeJobs.size < MAX_CONCURRENT_DOWNLOADS) {
+                val task = pendingQueue.poll() ?: break
+                
+                val job = scope.launch {
+                    try {
+                        executeDownload(task)
+                    } catch (e: CancellationException) {
+                        // Task cleanly cancelled via Coroutine Job
+                    } catch (e: java.io.IOException) {
+                        if (task.state == DownloadState.DOWNLOADING) {
+                            DownloadLogger.w("Network drop or connection reset for ${task.id}, auto-pausing. (${e.message})")
+                            task.state = DownloadState.PAUSED
+                            listener?.onStateChanged(task)
+                        }
+                    } catch (e: Exception) {
+                        if (task.state == DownloadState.DOWNLOADING) {
+                            DownloadLogger.e("Download error for ${task.id}", e)
+                            task.state = DownloadState.FAILED
+                            task.error = e.message ?: "Unknown error"
+                            listener?.onStateChanged(task)
+                        }
+                    } finally {
+                        activeJobs.remove(task.id)
+                        activeCalls.remove(task.id)
+                        if (task.state == DownloadState.FAILED) {
+                            tasks.remove(task.id)
+                        }
+                        DownloadLogger.d("Finished coroutine for ${task.id}, state is ${task.state}")
+                        processNextInQueue() // Pull next upon completion/failure/pause
                     }
-                } catch (e: Exception) {
-                    if (task.state == DownloadState.DOWNLOADING) {
-                        DownloadLogger.e("Download error for ${task.id}", e)
-                        task.state = DownloadState.FAILED
-                        task.error = e.message ?: "Unknown error"
-                        listener?.onStateChanged(task)
-                    }
-                } finally {
-                    activeJobs.remove(task.id)
-                    activeCalls.remove(task.id)
-                    if (task.state == DownloadState.FAILED) {
-                        tasks.remove(task.id)
-                    }
-                    DownloadLogger.d("Finished coroutine for ${task.id}, state is ${task.state}")
-                    processNextInQueue() // Pull next upon completion/failure/pause
                 }
+                activeJobs[task.id] = job
             }
-            activeJobs[task.id] = job
         }
         
         checkAndStopServiceIfEmpty()
@@ -345,7 +368,6 @@ object DownloadManager {
         if (task.url.isNullOrEmpty()) throw Exception("URL is empty after extraction")
         
         // If final file already exists and no tmp file, we might already be 100% complete
-        // But to be safe, let's check size. Actually if final file exists, we shouldn't even download.
         if (targetFile.exists() && !tempFile.exists()) {
             task.bytesWritten = targetFile.length()
             task.totalBytes = targetFile.length()

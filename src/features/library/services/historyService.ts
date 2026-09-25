@@ -1,46 +1,40 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { ExtractedTrack, BrowseItem } from 'react-native-hyper-extractor';
-import { upsertTrack } from '@/database/queries';
-import { upsertPlaybackHistory, prunePlaybackHistory, clearAllPlaybackHistory, removeTrackFromHistory, getRecentPlaybackHistory, getTopPlayedTracks } from '@/database/queries/historyQueries';
+import { upsertTrack, upsertTrackSync } from '@/database/queries/trackQueries';
+import { clearAllPlaybackHistory, removeTrackFromHistory, getRecentPlaybackHistory, getTopPlayedTracks, upsertPlaybackHistorySync, prunePlaybackHistorySync } from '@/database/queries/historyQueries';
+import { useLibraryStore } from '@/store/useLibraryStore';
+
 
 /**
- * Records a playback event in the SQLite database within an exclusive transaction, upserting track entity metadata and incrementing play counts.
- *
- * @param db - SQLite database connection instance.
- * @param track - Extracted track entity payload.
+ * Synchronously records a playback event. 
+ * Bypasses background async promise throttling, guaranteeing execution before JS suspends.
  */
-export async function recordPlay(db: SQLiteDatabase, track: ExtractedTrack) {
+export function recordPlaySync(db: SQLiteDatabase, track: ExtractedTrack) {
   try {
     const now = Date.now();
     
-    // Wrap in a standard transaction to prevent exclusive WAL filesystem deadlocks
-    await db.withTransactionAsync(async () => {
-      // 1. Ensure track exists
-      await upsertTrack(db, track);
-
-      // 2. Insert or update PlaybackHistory
-      await upsertPlaybackHistory(db, track.id, now);
+    db.withTransactionSync(() => {
+      upsertTrackSync(db, track);
+      upsertPlaybackHistorySync(db, track.id, now);
     });
 
-    // 3. Prune history to avoid infinite database growth
-    await pruneHistory(db);
-
+    pruneHistorySync(db);
+    useLibraryStore.getState().incrementLibraryRevision();
     
   } catch (error) {
-    console.error('[HistoryService] Failed to record play:', error);
-    // Silent fail to avoid crashing the playback flow
+    console.error('[HistoryService] Failed to record play sync:', error);
   }
 }
 
+
 /**
- * Ensures the PlaybackHistory table does not exceed a certain limit (e.g., 2000 items).
- * Overrides/deletes the oldest tracks by lastPlayedAt.
+ * Synchronous version of pruneHistory.
  */
-async function pruneHistory(db: SQLiteDatabase, limit: number = 100) {
+function pruneHistorySync(db: SQLiteDatabase, limit: number = 500) {
   try {
-    await prunePlaybackHistory(db, limit);
+    prunePlaybackHistorySync(db, limit);
   } catch (error) {
-    console.error('[HistoryService] Failed to prune history:', error);
+    console.error('[HistoryService] Failed to prune history sync:', error);
   }
 }
 
@@ -78,7 +72,7 @@ export async function getHeavyRotation(db: SQLiteDatabase, limit: number = 20): 
 export async function clearHistory(db: SQLiteDatabase): Promise<void> {
   try {
     await clearAllPlaybackHistory(db);
-    
+    useLibraryStore.getState().incrementLibraryRevision();
   } catch (error) {
     console.error('[HistoryService] Failed to clear history:', error);
   }
@@ -90,7 +84,7 @@ export async function clearHistory(db: SQLiteDatabase): Promise<void> {
 export async function deleteHistoryItem(db: SQLiteDatabase, trackId: string): Promise<void> {
   try {
     await removeTrackFromHistory(db, trackId);
-    
+    useLibraryStore.getState().incrementLibraryRevision();
   } catch (error) {
     console.error('[HistoryService] Failed to delete history item:', error);
   }
