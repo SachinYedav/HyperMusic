@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, AppState, AppStateStatus, PermissionsAndroid, Platform, Linking, BackHandler } from 'react-native';
+import { StyleSheet, View, AppState, AppStateStatus, PermissionsAndroid, Platform, Linking } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PlayerBottomSheet } from './features/player/components/PlayerBottomSheet';
@@ -16,7 +16,6 @@ import { useDownloadStore } from './features/library/store/useDownloadStore';
 import { networkListener } from './features/library/services/networkListener';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSafeDatabase } from '@/database/useSafeDatabase';
-import { AppConfirmSheet } from '@/ui/AppConfirmSheet';
 import { useAppUpdater } from '@/hooks/useAppUpdater';
 
 import { NavigationContainer, DefaultTheme, LinkingOptions } from '@react-navigation/native';
@@ -38,7 +37,8 @@ function InnerApp() {
   const { isDark, colors } = useTheme();
   const db = useSafeDatabase();
 
-  const { showMandatoryUpdate, updateUrl } = useAppUpdater(isReady);
+  // Non-blocking update check on launch (no destructive exit modals)
+  useAppUpdater(isReady);
 
   const navTheme = {
     ...DefaultTheme,
@@ -132,16 +132,6 @@ function InnerApp() {
         <ArtistSelectionSheet />
         <PlayerBottomSheet />
         <GlobalToast />
-        <AppConfirmSheet
-          visible={showMandatoryUpdate}
-          title="Update Required"
-          message="A critical update is required to continue using HyperMusic."
-          confirmText="Update Now"
-          cancelText="Exit App"
-          isDestructive={true}
-          onConfirm={() => Linking.openURL(updateUrl)}
-          onCancel={() => BackHandler.exitApp()}
-        />
       </NavigationContainer>
 
       {!isSplashAnimationComplete && (

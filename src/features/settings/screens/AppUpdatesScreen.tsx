@@ -7,6 +7,14 @@ import { ArrowLeft, RefreshCw, DownloadCloud, Info, ChevronRight, AlertCircle, C
 import Constants from 'expo-constants';
 import { updateService, AppUpdateData } from '@/services/api/updateService';
 
+const getChangelogDotColor = (type?: string, index: number = 0) => {
+  if (type === 'improvement') return '#38BDF8';
+  if (type === 'fix') return '#34D399';
+  if (type === 'patch') return '#A78BFA';
+  const palette = ['#38BDF8', '#A78BFA', '#34D399', '#FBBF24'];
+  return palette[index % palette.length];
+};
+
 const SettingsSection = ({ title, children, colors }: any) => (
   <View style={styles.sectionContainer}>
     {title && <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>}
@@ -111,23 +119,64 @@ export function AppUpdatesScreen() {
 
         {updateAvailable && updateData && (
           <View style={[styles.updateBanner, { backgroundColor: colors.surface }]}>
-            <View style={styles.bannerIconContainer}>
-              <View style={[styles.bannerIconCircle, { backgroundColor: colors.brandMuted }]}>
-                <DownloadCloud color={colors.brand} size={32} />
+            <View style={styles.bannerHeaderRow}>
+              <View style={styles.bannerLeftInfo}>
+                <View style={[styles.bannerIconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
+                  <DownloadCloud color={colors.text} size={22} />
+                </View>
+                <View style={styles.bannerTextContainer}>
+                  <Text style={[styles.bannerTitle, { color: colors.text }]}>Update Ready</Text>
+                  <Text style={[styles.bannerSubtitle, { color: colors.textMuted }]}>Version {updateData.latestVersion} is available to install</Text>
+                </View>
+              </View>
+              <View style={[styles.versionBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}>
+                <Text style={[styles.versionBadgeText, { color: colors.textMuted }]}>v{updateData.latestVersion}</Text>
               </View>
             </View>
-            <View style={styles.bannerTextContainer}>
-              <Text style={[styles.bannerTitle, { color: colors.text }]}>Update Available!</Text>
-              <Text style={[styles.bannerSubtitle, { color: colors.textMuted }]}>Version {updateData.latestVersion} is ready to download.</Text>
-            </View>
+
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: colors.brand }]}
+              style={[styles.primaryButton, { backgroundColor: isDark ? colors.white : colors.black }]}
               onPress={handleDownload}
               activeOpacity={0.8}
             >
-              <Text style={[styles.primaryButtonText, { color: colors.white }]}>Download Update</Text>
-              <ExternalLink color={colors.white} size={18} style={{ marginLeft: 8 }} />
+              <Text style={[styles.primaryButtonText, { color: isDark ? colors.black : colors.white }]}>Download Update</Text>
+              <ExternalLink color={isDark ? colors.black : colors.white} size={16} style={{ marginLeft: 8 }} />
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Optional Release Advisory Card */}
+        {updateAvailable && updateData?.advisory && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.advisoryHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted, marginBottom: 0, marginLeft: 0 }]}>
+                {updateData.advisory.badge || "Release Advisory"}
+              </Text>
+              <Text style={[styles.advisorySubBadge, { color: colors.textMuted }]}>Optional Upgrade</Text>
+            </View>
+            <View style={[styles.card, { backgroundColor: colors.surface, padding: spacing.lg }]}>
+              <View style={styles.advisoryTitleRow}>
+                <View style={[styles.advisoryIndicatorDot, { backgroundColor: colors.warning }]} />
+                <Text style={[styles.advisoryTitleText, { color: colors.text }]}>
+                  {updateData.advisory.title}
+                </Text>
+              </View>
+              <Text style={[styles.advisoryDescription, { color: colors.textMuted, marginBottom: Array.isArray(updateData.advisory.notes) && updateData.advisory.notes.length > 0 ? spacing.md : 0 }]}>
+                {updateData.advisory.description}
+              </Text>
+              {Array.isArray(updateData.advisory.notes) && updateData.advisory.notes.length > 0 && (
+                <View style={[styles.advisoryNotesList, { borderTopColor: colors.border }]}>
+                  {updateData.advisory.notes.map((note: string, nIdx: number) => (
+                    <View key={nIdx} style={styles.advisoryNoteRow}>
+                      <View style={[styles.advisoryNoteDot, { backgroundColor: colors.textSubtle }]} />
+                      <Text style={[styles.advisoryNoteText, { color: colors.textMuted }]}>
+                        {note}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
           </View>
         )}
 
@@ -176,10 +225,10 @@ export function AppUpdatesScreen() {
         {updateAvailable && updateData && (
           <View style={styles.sectionContainer}>
             <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{`What's New in v${updateData.latestVersion}`}</Text>
-            <View style={{ paddingHorizontal: spacing.xs, marginTop: spacing.sm }}>
+            <View style={[styles.card, { backgroundColor: colors.surface, padding: spacing.lg }]}>
               {updateData.changelog.map((item, i: number) => (
                 <View key={i} style={[styles.changelogBullet, i === updateData.changelog.length - 1 && { marginBottom: 0 }]}>
-                  <View style={[styles.bulletDot, { backgroundColor: colors.textMuted }]} />
+                  <View style={[styles.bulletDot, { backgroundColor: getChangelogDotColor(item.type, i) }]} />
                   <Text style={[styles.changelogText, { color: colors.text }]}>{item.text}</Text>
                 </View>
               ))}
@@ -223,7 +272,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   card: {
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     overflow: 'hidden',
   },
   optionRow: {
@@ -242,54 +291,49 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '500',
   },
-  changelogWrapper: {
-    padding: spacing.lg,
-  },
-  changelogBullet: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  bulletDot: {
-    width: 6,
-    height: 6,
-    borderRadius: radius.full,
-    marginTop: spacing.sm,
-    marginRight: spacing.md,
-  },
-  changelogText: {
-    flex: 1,
-    fontSize: typography.body,
-    lineHeight: 22,
-  },
   updateBanner: {
-    padding: spacing.xl,
+    padding: spacing.lg,
     borderRadius: radius.md,
-    alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  bannerIconContainer: {
-    marginBottom: spacing.md,
+  bannerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  bannerLeftInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
   },
   bannerIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bannerTextContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+    flex: 1,
   },
   bannerTitle: {
-    fontSize: typography.title,
+    fontSize: typography.body,
     fontWeight: 'bold',
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   bannerSubtitle: {
-    fontSize: typography.body,
-    textAlign: 'center',
+    fontSize: typography.bodySm,
+  },
+  versionBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+  },
+  versionBadgeText: {
+    fontSize: typography.caption,
+    fontWeight: '600',
   },
   primaryButton: {
     flexDirection: 'row',
@@ -302,6 +346,73 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: typography.body,
+    fontWeight: '600',
+  },
+  advisoryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs,
+  },
+  advisorySubBadge: {
+    fontSize: typography.caption,
+  },
+  advisoryTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  advisoryIndicatorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  advisoryTitleText: {
+    fontSize: typography.bodySm,
     fontWeight: 'bold',
+  },
+  advisoryDescription: {
+    fontSize: typography.bodySm,
+    lineHeight: 20,
+  },
+  advisoryNotesList: {
+    borderTopWidth: 1,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
+  },
+  advisoryNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  advisoryNoteDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginTop: 7,
+    marginRight: spacing.sm,
+  },
+  advisoryNoteText: {
+    flex: 1,
+    fontSize: typography.bodySm,
+    lineHeight: 18,
+  },
+  changelogBullet: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  bulletDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.full,
+    marginTop: 7,
+    marginRight: spacing.md,
+  },
+  changelogText: {
+    flex: 1,
+    fontSize: typography.bodySm,
+    lineHeight: 20,
   },
 });

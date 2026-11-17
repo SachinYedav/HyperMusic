@@ -1,6 +1,6 @@
 {
   "name": "react-native-hyper-player",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "description": "Custom internal media engine for HyperMusic, built with Nitro Modules and AndroidX Media3.",
   "main": "./lib/commonjs/index.js",
