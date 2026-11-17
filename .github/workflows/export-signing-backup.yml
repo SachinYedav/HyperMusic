@@ -1,0 +1,83 @@
+name: Export encrypted signing backup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install encryption tool
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y age
+
+      - name: Encrypt signing bundle
+        shell: bash
+        env:
+          AGE_RECIPIENT: age1l80unqvwpuuxeu9sf00mt5raex265we5zk9snfwmen7q7u3en3sql7qj2d
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY' | age \
+            -r "$AGE_RECIPIENT" \
+            -o "$RUNNER_TEMP/hypermusic-signing.zip.age"
+          import base64
+          import io
+          import json
+          import os
+          import sys
+          import zipfile
+
+          names = [
+              "KEYSTORE_BASE64",
+              "STORE_PASSWORD",
+              "KEY_PASSWORD",
+              "KEY_ALIAS",
+          ]
+          if any(not os.environ.get(name) for name in names):
+              raise SystemExit("Required signing secret is missing")
+
+          encoded = "".join(os.environ["KEYSTORE_BASE64"].split())
+          keystore = base64.b64decode(encoded, validate=True)
+          if not keystore:
+              raise SystemExit("Keystore is empty")
+
+          credentials = {
+              "storePassword": os.environ["STORE_PASSWORD"],
+              "keyPassword": os.environ["KEY_PASSWORD"],
+              "keyAlias": os.environ["KEY_ALIAS"],
+          }
+
+          bundle = io.BytesIO()
+          with zipfile.ZipFile(bundle, "w") as archive:
+              archive.writestr("hypermusic-release.keystore", keystore)
+              archive.writestr(
+                  "credentials.json",
+                  json.dumps(credentials),
+              )
+
+          sys.stdout.buffer.write(bundle.getvalue())
+          PY
+
+      - name: Upload encrypted backup only
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypermusic-signing-encrypted
+          path: ${{ runner.temp }}/hypermusic-signing.zip.age
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Remove temporary encrypted file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/hypermusic-signing.zip.age"
